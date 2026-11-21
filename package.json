@@ -8,5 +8,8 @@
   "scripts": {
     "start": "python3 -m http.server 8080",
     "test": "node tests/engine.test.mjs && node tests/tower-fixes.test.mjs && node tests/tracon.test.mjs && node tests/ui-state.test.mjs"
+  },
+  "devDependencies": {
+    "@doeixd/opencode-ralph-rlm": "^0.4.3"
   }
 }

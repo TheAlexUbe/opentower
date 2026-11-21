@@ -1,0 +1,17 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "provider": {
+    "ralph-rlm": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "Ralph RLM",
+      "options": {
+        "baseURL": "http://localhost:8787/v1"
+      },
+      "models": {
+        "supervisor": {
+          "name": "Ralph Supervisor (loop orchestrator)"
+        }
+      }
+    }
+  }
+}

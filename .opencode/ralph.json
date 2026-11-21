@@ -1,0 +1,23 @@
+{
+  "enabled": true,
+  "maxAttempts": 20,
+  "verifyTimeoutMinutes": 15,
+  "verify": {
+    "command": [
+      "npm",
+      "test"
+    ],
+    "cwd": "."
+  },
+  "gateDestructiveToolsUntilContextLoaded": true,
+  "subAgentEnabled": true,
+  "plans": {
+    "dir": ".ralph-rlm/plans",
+    "active": "default"
+  },
+  "swarm": {
+    "enabled": true,
+    "maxConcurrent": 5,
+    "unsafeEvalEnabled": false
+  }
+}
