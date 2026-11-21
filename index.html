@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>OpenTower — free browser ATC simulator</title>
+    <meta name="description" content="OpenTower is a free, open-source air traffic control simulator in your browser. Work ground and tower at Copper Mesa with local pilots. No account, no paywall." />
+    <meta name="theme-color" content="#05080d" />
+    <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+    <link rel="manifest" href="manifest.webmanifest" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div id="app">
+      <header class="topbar">
+        <div class="brand">
+          <span class="brand-mark">◎</span>
+          <span class="brand-name">OPEN<strong>TOWER</strong></span>
+          <span class="brand-tag">FREE ATC SIM</span>
+        </div>
+        <div class="airport-line">
+          <span id="airport-name">KXCM · Copper Mesa</span>
+          <span class="sep">/</span>
+          <span>TWR <b id="freq-twr">118.3</b></span>
+          <span>GND <b id="freq-gnd">121.7</b></span>
+          <span>RWY <b id="active-rwy">27</b></span>
+          <span id="wind-line">WIND 270/08</span>
+        </div>
+        <div class="controls">
+          <span id="clock" class="clock">00:00</span>
+          <button id="btn-tts" class="btn ghost" title="Pilot voices">VOICE ON</button>
+          <button id="btn-pause" class="btn ghost" title="Pause">❚❚</button>
+          <button id="btn-speed" class="btn ghost" title="Simulation speed">1×</button>
+          <button id="btn-new" class="btn ghost" title="New shift">NEW</button>
+        </div>
+      </header>
+
+      <main class="layout">
+        <section class="scope-wrap" id="scope-wrap">
+          <canvas id="scope" aria-label="Airport radar scope"></canvas>
+          <div id="scope-alert" class="scope-alert hidden" role="status" aria-live="polite"></div>
+          <div class="scope-help">Click an aircraft · type a clearance · Enter to transmit</div>
+        </section>
+
+        <aside class="side">
+          <div class="panel-head">
+            <span>FLIGHT STRIPS</span>
+            <span id="strip-count" class="badge">0</span>
+          </div>
+          <div id="strips" class="strips"></div>
+
+          <div class="panel-head radio-head">
+            <span>RADIO</span>
+            <span class="badge" id="pending-badge">0 waiting</span>
+          </div>
+          <div id="radio" class="radio"></div>
+          <div id="live-radio" class="sr-only" aria-live="polite" aria-atomic="true"></div>
+        </aside>
+      </main>
+
+      <footer class="comms">
+        <form id="cmd-form" autocomplete="off">
+          <label for="cmd" id="cmd-label">TRANSMIT</label>
+          <input id="cmd" name="cmd" type="text" spellcheck="false" placeholder="e.g. SWA123 taxi to runway 27 via alpha" />
+          <button type="button" id="btn-mic" class="btn mic" title="Push to talk (M)" aria-pressed="false">MIC</button>
+          <button type="submit" id="btn-send" class="btn send">SEND</button>
+        </form>
+        <div id="quick" class="quick"></div>
+      </footer>
+      <div id="voice-toast" class="voice-toast hidden" role="status" aria-live="polite"></div>
+    </div>
+
+    <div id="start" class="overlay">
+      <div class="modal start-modal" role="dialog" aria-modal="true" aria-labelledby="start-title">
+        <div class="modal-kicker">COPPER MESA · KXCM</div>
+        <h1 id="start-title">OPEN<strong>TOWER</strong></h1>
+        <p class="lede">A free browser ATC simulator. Work Ground and Tower at a single-runway field, or take the approach radar, with local pilots that call, read back and occasionally get it wrong.</p>
+        <div class="pick scenario-pick">
+          <span class="pick-label">SCENARIO</span>
+          <select id="scenario-select" class="select"></select>
+          <p id="scenario-desc" class="scenario-desc"></p>
+        </div>
+        <div class="start-grid">
+          <div class="pick">
+            <span class="pick-label">SHIFT LENGTH</span>
+            <div class="chips" id="duration-chips">
+              <button type="button" data-duration="300">5 min</button>
+              <button type="button" data-duration="600" class="on">10 min</button>
+              <button type="button" data-duration="1200">20 min</button>
+            </div>
+          </div>
+          <div class="pick">
+            <span class="pick-label">TRAFFIC</span>
+            <div class="chips" id="difficulty-chips">
+              <button type="button" data-difficulty="calm" class="on">Calm</button>
+              <button type="button" data-difficulty="busy">Busy</button>
+              <button type="button" data-difficulty="rush">Rush</button>
+            </div>
+          </div>
+          <div class="pick">
+            <span class="pick-label">RADIO LANGUAGE · IDIOMA</span>
+            <div class="chips" id="lang-chips">
+              <button type="button" data-lang="en" class="on">English</button>
+              <button type="button" data-lang="es">Español</button>
+            </div>
+          </div>
+        </div>
+        <p class="fine">Radio language · Idioma de radio: switches ATC/pilot phraseology, speech recognition and quick commands. Los menús siguen en inglés.</p>
+        <label class="wx-toggle">
+          <input type="checkbox" id="live-wx" checked />
+          <span>LIVE WEATHER</span>
+          <span class="muted">KPHX observation via NWS · wind sets the runway</span>
+        </label>
+        <p id="wx-line" class="wx-line"></p>
+        <button id="btn-start" class="btn primary big">START FREE SHIFT →</button>
+        <p class="fine">No account. No paywall. Runs entirely in your browser. <span id="best-line"></span></p>
+        <p class="fine">Tip: pause and 1× / 2× / 4× speed live in the header. Speech recognition needs Chrome/Edge; typing always works.</p>
+        <div class="howto">
+          <div><b>1</b> Click a strip or aircraft.</div>
+          <div><b>2</b> Type your clearance: <code>N123AB taxi to runway 27</code>.</div>
+          <div><b>3</b> Then: <code>line up and wait</code>, <code>cleared for takeoff</code>, <code>cleared to land</code>, <code>taxi to the ramp</code>.</div>
+          <div><b>4</b> North ramp: <code>cross runway 12</code> at the hold.</div>
+          <div><b>5</b> Approach mode: <code>turn left heading 270</code>, <code>descend 3000</code>, <code>cleared ILS</code>, <code>contact tower</code>.</div>
+          <div><b>6</b> Español: <code>N123AB ruede a la pista 27 por alfa</code>, <code>autorizado para despegar</code>, <code>autorizado para aterrizar</code>.</div>
+          <div><b>7</b> Voice: click <b>MIC</b> (or press <b>M</b>) and speak. Chrome/Edge only; Brave may block speech recognition. <b>V</b> mutes pilot voices.</div>
+        </div>
+        <p class="credit">Open source · MIT · inspired by the tower/ground genre. Not affiliated with any commercial simulator.</p>
+      </div>
+    </div>
+
+    <div id="end" class="overlay hidden">
+      <div class="modal end-modal" role="dialog" aria-modal="true" aria-label="Shift debrief">
+        <div class="modal-kicker">SHIFT DEBRIEF</div>
+        <div class="grade-row">
+          <div id="grade" class="grade">A</div>
+          <div>
+            <div id="total" class="total">92 / 100</div>
+            <div id="grade-note" class="muted">Smooth, safe and efficient.</div>
+          </div>
+        </div>
+        <div id="score-parts" class="score-parts"></div>
+        <div id="objectives-wrap" class="hidden">
+          <div class="incident-head">OBJECTIVES</div>
+          <ul id="objectives" class="objectives"></ul>
+        </div>
+        <div class="incident-head">INCIDENTS</div>
+        <ul id="incident-list" class="incident-list"></ul>
+        <div class="end-actions">
+          <button id="btn-again" class="btn primary">PLAY AGAIN</button>
+          <button id="btn-menu" class="btn ghost">CHANGE SHIFT</button>
+        </div>
+      </div>
+    </div>
+
+    <script type="module" src="src/main.js"></script>
+  </body>
+</html>
