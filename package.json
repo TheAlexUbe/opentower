@@ -1,0 +1,12 @@
+{
+  "name": "opentower",
+  "version": "1.0.0",
+  "description": "OpenTower: a free, open-source browser ATC simulator",
+  "type": "module",
+  "private": true,
+  "license": "MIT",
+  "scripts": {
+    "start": "python3 -m http.server 8080",
+    "test": "node tests/engine.test.mjs && node tests/tower-fixes.test.mjs && node tests/tracon.test.mjs && node tests/ui-state.test.mjs"
+  }
+}

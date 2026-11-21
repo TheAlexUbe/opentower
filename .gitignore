@@ -1,0 +1,8 @@
+# Generated knowledge-graph artifacts (contain local machine paths)
+graphify-out/
+
+# Dependencies and editor/OS noise
+node_modules/
+.DS_Store
+Thumbs.db
+*.log
