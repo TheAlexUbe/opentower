@@ -168,6 +168,40 @@ assert.equal(g09.courseHeading, 270);
   assert.equal(score.parts.length, 3);
 }
 
+// A shift with no answered calls must not get free communication credit.
+{
+  const e = new SimEngine({ duration: 600, difficulty: 'calm', seed: 4 });
+  e.spawnTimer = 9999;
+  e.aircraft = [];
+  e.stats.responseTimes = [];
+  e.stats.unanswered = 0;
+  const comms = e.computeScore().parts.find((p) => p.key === 'communication');
+  assert.equal(comms.points, 0, 'no answered calls => 0 communication points');
+}
+
+// Unanswered pilot calls subtract from communication points.
+{
+  const e = new SimEngine({ duration: 600, difficulty: 'calm', seed: 5 });
+  e.spawnTimer = 9999;
+  e.aircraft = [];
+  e.stats.responseTimes = [5, 8, 12];
+  e.stats.unanswered = 0;
+  const base = e.computeScore().parts.find((p) => p.key === 'communication').points;
+  e.stats.unanswered = 3;
+  const penalized = e.computeScore().parts.find((p) => p.key === 'communication').points;
+  assert.equal(base - penalized, 6, '2 points per unanswered call');
+  assert.ok(penalized >= 0, 'communication score never goes negative');
+
+  const es = new SimEngine({ duration: 600, difficulty: 'calm', seed: 6, lang: 'es' });
+  es.spawnTimer = 9999;
+  es.aircraft = [];
+  es.stats.responseTimes = [];
+  const esScore = es.computeScore();
+  assert.equal(esScore.parts[0].label, 'Seguridad');
+  assert.equal(esScore.parts[1].label, 'Comunicación');
+  assert.match(esScore.parts[1].notes[0], /No se respondió ninguna llamada/);
+}
+
 // --- holding short blocks the runway --------------------------------------
 {
   const e = new SimEngine({ duration: 600, difficulty: 'calm', seed: 11 });
