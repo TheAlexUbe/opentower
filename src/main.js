@@ -2,10 +2,11 @@
 import { SimEngine } from './engine.js';
 import { Renderer } from './render.js';
 import { TraconEngine, TraconRenderer } from './tracon.js';
-import { AIRPORT, DIFFICULTIES } from './config.js';
-import { SCENARIOS, scenarioById } from './scenarios.js';
+import { AIRPORT } from './config.js';
+import { SCENARIOS, scenarioById, scenarioName, scenarioTagline, scenarioDescription } from './scenarios.js';
 import { effectiveScenarioSettings, bestScoreKey } from './scenario-state.js';
-import { preferredRadioLang, speechErrorMessage, speechLang, transcriptsFromSpeechEvent } from './voice.js';
+import { t } from './i18n.js';
+import { preferredRadioLang, phoneticSpeech, speechErrorMessage, speechLang, transcriptsFromSpeechEvent } from './voice.js';
 import { fetchWeather } from './weather.js';
 
 const $ = (sel) => document.querySelector(sel);
@@ -53,13 +54,60 @@ settings.lang = preferredRadioLang(storedLang, navigator.language);
 
 const isEs = () => settings.lang === 'es';
 const ui = (en, es) => (isEs() ? es : en);
+const tr = (key, vars = {}) => t(settings.lang, key, vars);
+
+function setSelected(id) {
+  selectedId = id;
+  if (renderer) renderer.selectedId = selectedId;
+}
 
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+function applyStaticI18n(lang = settings.lang) {
+  document.documentElement.lang = lang;
+  document.title = t(lang, 'appTitle');
+  for (const el of document.querySelectorAll('[data-i18n]')) {
+    el.textContent = t(lang, el.dataset.i18n);
+  }
+  for (const el of document.querySelectorAll('[data-i18n-html]')) {
+    el.innerHTML = t(lang, el.dataset.i18nHtml);
+  }
+  for (const el of document.querySelectorAll('[data-i18n-placeholder]')) {
+    el.placeholder = t(lang, el.dataset.i18nPlaceholder);
+  }
+  for (const el of document.querySelectorAll('[data-i18n-title]')) {
+    el.title = t(lang, el.dataset.i18nTitle);
+  }
+  for (const el of document.querySelectorAll('[data-i18n-aria-label]')) {
+    el.setAttribute('aria-label', t(lang, el.dataset.i18nAriaLabel));
+  }
+  const pause = $('#btn-pause');
+  if (pause) {
+    const key = paused ? 'resume' : 'pause';
+    pause.title = t(lang, key);
+    pause.setAttribute('aria-label', t(lang, key));
+  }
+  const mic = $('#btn-mic');
+  if (mic) {
+    if (mic.disabled) {
+      mic.title = t(lang, 'micTitleUnsupported');
+      mic.setAttribute('aria-label', t(lang, 'micTitleUnsupported'));
+    } else if (mic.dataset.braveHint) {
+      mic.title = t(lang, 'braveHint');
+      mic.setAttribute('aria-label', t(lang, 'braveHint'));
+    } else {
+      mic.title = t(lang, 'pushToTalk');
+      mic.setAttribute('aria-label', t(lang, 'pushToTalk'));
+    }
+  }
+}
 
 // ------------------------------------------------------------------ overlays
 function selectChip(container, attr, value) {
   for (const b of container.querySelectorAll('button')) {
-    b.classList.toggle('on', b.dataset[attr] === String(value));
+    const on = b.dataset[attr] === String(value);
+    b.classList.toggle('on', on);
+    b.setAttribute('aria-pressed', String(on));
   }
 }
 
@@ -91,32 +139,39 @@ function applyLanguage(lang, { persist = true } = {}) {
   const next = lang === 'es' ? 'es' : 'en';
   settings.lang = next;
   selectChip(langChips, 'lang', next);
+  applyStaticI18n(next);
   const cmd = $('#cmd');
-  if (cmd) {
-    cmd.placeholder = next === 'es'
-      ? 'p. ej. SWA123 ruede a la pista 27 por alfa'
-      : 'e.g. SWA123 taxi to runway 27 via alpha';
-    cmd.setAttribute('lang', next);
-  }
+  if (cmd) cmd.setAttribute('lang', next);
   for (const sel of ['#radio', '#live-radio', '#quick', '#strips', '#pending-badge', '#scope-alert', '#voice-toast', '.scope-help', '#wind-line']) {
     const el = $(sel);
     if (el) el.setAttribute('lang', next);
   }
-  const label = $('#cmd-label');
-  if (label) label.textContent = next === 'es' ? 'TRANSMITIR' : 'TRANSMIT';
-  const send = $('#btn-send');
-  if (send) send.textContent = next === 'es' ? 'ENVIAR' : 'SEND';
+  populateScenarioOptions();
+  showBest();
   if (recognition) recognition.lang = speechLang(next);
   if ($('#btn-tts')) updateTtsButton();
+  if (engine) {
+    setWxLine(engine.weather, engine);
+    renderStrips();
+    renderQuick();
+    updateHeader();
+    renderAlert();
+  }
   if (persist) safeSet('opentower.lang', next);
 }
 
 const scenarioSelect = $('#scenario-select');
-for (const s of SCENARIOS) {
-  const opt = document.createElement('option');
-  opt.value = s.id;
-  opt.textContent = `${s.name} — ${s.tagline}`;
-  scenarioSelect.appendChild(opt);
+
+function populateScenarioOptions() {
+  const selected = settings.scenarioId;
+  scenarioSelect.replaceChildren();
+  for (const s of SCENARIOS) {
+    const opt = document.createElement('option');
+    opt.value = s.id;
+    opt.textContent = `${scenarioName(s, settings.lang)} — ${scenarioTagline(s, settings.lang)}`;
+    scenarioSelect.appendChild(opt);
+  }
+  scenarioSelect.value = selected;
 }
 
 function setChipsLocked(container, locked) {
@@ -128,7 +183,7 @@ function applyScenario(id) {
   const s = scenarioById(id);
   settings.scenarioId = s.id;
   scenarioSelect.value = s.id;
-  $('#scenario-desc').textContent = s.description;
+  $('#scenario-desc').textContent = scenarioDescription(s, settings.lang);
   const eff = effectiveScenarioSettings(s, {
     duration: settings.freeDuration,
     difficulty: settings.freeDifficulty,
@@ -155,24 +210,23 @@ function showBest() {
   });
   const best = Number(safeGet(bestScoreKey(scenario.id, eff.difficulty), '0')) || 0;
   $('#best-line').textContent = best
-    ? `Best ${scenario.name} · ${DIFFICULTIES[eff.difficulty].label}: ${best}/100.`
+    ? `${tr('best')} ${scenarioName(scenario, settings.lang)} · ${tr(eff.difficulty)}: ${best}/100.`
     : '';
 }
 
 async function startShift() {
   const startBtn = $('#btn-start');
-  if (!startBtn.dataset.label) startBtn.dataset.label = startBtn.textContent;
-  const label = startBtn.dataset.label;
   startBtn.disabled = true;
   let weather = null;
   if (settings.liveWx) {
-    startBtn.textContent = 'FETCHING LIVE WEATHER…';
+    startBtn.textContent = tr('fetching');
     weather = await fetchWeather({ timeoutMs: 3000 });
   }
-  startBtn.textContent = label;
+  startBtn.textContent = tr('startShift');
   startBtn.disabled = false;
 
   activeScenario = scenarioById(settings.scenarioId);
+  safeSet('opentower.onboarded', '1');
   const common = {
     duration: settings.duration,
     difficulty: settings.difficulty,
@@ -190,39 +244,35 @@ async function startShift() {
   }
   speed = 1;
   paused = false;
-  selectedId = null;
+  setSelected(null);
   endShown = false;
+  lastAlertText = null;
   renderer.setEngine(engine);
+  renderer.selectedId = selectedId;
   renderer.resize();
   $('#start').classList.add('hidden');
   $('#end').classList.add('hidden');
+  $('#app').inert = false;
   $('#btn-speed').textContent = '1×';
-  $('#btn-pause').textContent = '❚❚';
+  updatePauseButton();
   $('#active-rwy').textContent = engine.geo.runway;
-  $('#wind-line').textContent = ui(
-    `WIND ${String(engine.wind.dir).padStart(3, '0')}/${String(engine.wind.speed).padStart(2, '0')} · A${engine.altimeter}`,
-    `VIENTO ${String(engine.wind.dir).padStart(3, '0')}/${String(engine.wind.speed).padStart(2, '0')} · A${engine.altimeter}`,
-  );
+  $('#wind-line').textContent = `${tr('wind')} ${String(engine.wind.dir).padStart(3, '0')}/${String(engine.wind.speed).padStart(2, '0')} · A${engine.altimeter}`;
   if (engine.mode === 'tracon') {
     $('#airport-name').textContent = 'COPPER APPROACH · APP';
     $('#freq-twr').textContent = '124.2';
     $('#freq-gnd').textContent = '—';
-    $('#scope').setAttribute('aria-label', ui('Approach radar scope', 'Pantalla de radar de aproximación'));
-    document.querySelector('.scope-help').textContent = ui(
-      'Click a target · vector, descend, clear the approach · Enter to transmit',
-      'Haga clic en un objetivo · vectorice, descienda, autorice la aproximación · Enter para transmitir',
-    );
+    $('#scope').setAttribute('aria-label', tr('scopeTraconAria'));
+    document.querySelector('.scope-help').textContent = tr('scopeTracon');
   } else {
     $('#airport-name').textContent = `${AIRPORT.code} · ${AIRPORT.name}`;
     $('#freq-twr').textContent = AIRPORT.tower;
     $('#freq-gnd').textContent = AIRPORT.ground;
-    $('#scope').setAttribute('aria-label', ui('Airport radar scope', 'Pantalla de radar del aeropuerto'));
-    document.querySelector('.scope-help').textContent = ui(
-      'Click an aircraft · type a clearance · Enter to transmit',
-      'Haga clic en una aeronave · escriba una autorización · Enter para transmitir',
-    );
+    $('#scope').setAttribute('aria-label', tr('scopeTowerAria'));
+    document.querySelector('.scope-help').textContent = tr('scopeTower');
   }
   setWxLine(weather, engine);
+  resetRadioLog();
+  resetStrips();
   renderStrips();
   renderRadio();
   renderQuick();
@@ -230,7 +280,7 @@ async function startShift() {
   resetSpeechCursor();
   $('#cmd').focus();
   lastTs = performance.now();
-  if (raf) cancelAnimationFrame(raf);
+  stopLoop();
   raf = requestAnimationFrame(frame);
 }
 
@@ -238,34 +288,34 @@ function setWxLine(weather, eng) {
   const line = $('#wx-line');
   if (weather?.live) {
     line.className = 'wx-line';
-    line.textContent = `${isEs() ? 'EN VIVO' : 'LIVE'} · ${weather.raw}`;
+    line.textContent = `${tr('live')} · ${weather.raw}`;
   } else if (eng) {
     line.className = 'wx-line sim';
-    line.textContent = isEs()
-      ? `VIENTO SIM · viento ${String(eng.wind.dir).padStart(3, '0')}/${String(eng.wind.speed).padStart(2, '0')} · A${eng.altimeter}`
-      : `SIM WX · wind ${String(eng.wind.dir).padStart(3, '0')}/${String(eng.wind.speed).padStart(2, '0')} · A${eng.altimeter}`;
+    line.textContent = `${tr('simWx')} · ${tr('wind')} ${String(eng.wind.dir).padStart(3, '0')}/${String(eng.wind.speed).padStart(2, '0')} · A${eng.altimeter}`;
   } else {
     line.className = 'wx-line sim';
-    line.textContent = isEs()
-      ? (settings.liveWx ? 'Clima en vivo no disponible — se usará viento simulado.' : '')
-      : (settings.liveWx ? 'Live weather unavailable — simulated wind will be used.' : '');
+    line.textContent = settings.liveWx ? tr('weatherUnavailable') : '';
   }
 }
 
 $('#btn-start').addEventListener('click', startShift);
 $('#btn-again').addEventListener('click', startShift);
 $('#btn-menu').addEventListener('click', () => {
+  stopLoop();
+  $('#app').inert = true;
   $('#end').classList.add('hidden');
   $('#start').classList.remove('hidden');
   showBest();
-  requestAnimationFrame(() => $('#btn-start').focus());
+  requestAnimationFrame(() => $('#start .modal').focus());
 });
 $('#btn-new').addEventListener('click', () => {
   if (engine) engine.paused = true;
+  stopLoop();
+  $('#app').inert = true;
   $('#end').classList.add('hidden');
   $('#start').classList.remove('hidden');
   showBest();
-  requestAnimationFrame(() => $('#btn-start').focus());
+  requestAnimationFrame(() => $('#start .modal').focus());
 });
 
 // ------------------------------------------------------------------ controls
@@ -273,7 +323,7 @@ $('#btn-pause').addEventListener('click', () => {
   if (!engine || engine.finished) return;
   paused = !paused;
   engine.paused = paused;
-  $('#btn-pause').textContent = paused ? '▶' : '❚❚';
+  updatePauseButton();
 });
 
 $('#btn-speed').addEventListener('click', () => {
@@ -315,7 +365,7 @@ document.addEventListener('keydown', (e) => {
     speed = Number(e.key);
     $('#btn-speed').textContent = `${speed}×`;
   } else if (e.key === 'Escape') {
-    selectedId = null;
+    setSelected(null);
     renderStrips();
   } else if (e.key.toLowerCase() === 'm') {
     toggleMic();
@@ -353,6 +403,8 @@ let listening = false;
 let ttsOn = true;
 let speechCursor = 0;
 let liveCursor = 0;
+let radioCursor = 0;
+let lastAlertText = null;
 let voiceToastTimer = null;
 let voices = [];
 
@@ -368,6 +420,12 @@ if (synth) {
 function resetSpeechCursor() {
   speechCursor = engine ? engine.radio.length : 0;
   liveCursor = engine ? engine.radio.length : 0;
+}
+
+function resetRadioLog() {
+  radioCursor = 0;
+  const box = $('#radio');
+  if (box) box.replaceChildren();
 }
 
 function showVoiceToast(text, tone = 'error', ms = 9000) {
@@ -397,7 +455,9 @@ function voiceError(code) {
 function speak(text) {
   if (!ttsOn || !synth || !text) return;
   if (listening) stopMic();
-  const u = new SpeechSynthesisUtterance(text);
+  const spoken = phoneticSpeech(text);
+  if (!spoken) return;
+  const u = new SpeechSynthesisUtterance(spoken);
   const lang = speechLang(settings.lang);
   const prefix = lang.slice(0, 2);
   const preferred = voices.find((v) => String(v.lang).toLowerCase().startsWith(prefix) && /(david|mark|alex|guy|male|jorge|diego|carlos|pablo|enrique|raul)/i.test(v.name))
@@ -424,9 +484,18 @@ function speakNewPilot() {
 }
 
 function updateTtsButton() {
-  $('#btn-tts').textContent = ui(ttsOn ? 'VOICE ON' : 'VOICE OFF', ttsOn ? 'VOZ ON' : 'VOZ OFF');
-  $('#btn-tts').title = ui('Pilot voices', 'Voces de los pilotos');
+  $('#btn-tts').textContent = ttsOn ? tr('voiceOn') : tr('voiceOff');
+  $('#btn-tts').title = tr('pilotVoices');
   $('#btn-tts').classList.toggle('off', !ttsOn);
+}
+
+function updatePauseButton() {
+  const btn = $('#btn-pause');
+  if (!btn) return;
+  btn.textContent = paused ? '▶' : '❚❚';
+  const key = paused ? 'resume' : 'pause';
+  btn.title = tr(key);
+  btn.setAttribute('aria-label', tr(key));
 }
 
 function toggleTts() {
@@ -445,7 +514,7 @@ if (SpeechRec) {
   recognition.onstart = () => {
     listening = true;
     $('#btn-mic').classList.add('listening');
-    $('#btn-mic').textContent = ui('LISTENING', 'ESCUCHANDO');
+    $('#btn-mic').textContent = tr('listening');
     $('#btn-mic').setAttribute('aria-pressed', 'true');
     hideVoiceToast();
     if (synth) synth.cancel();
@@ -474,20 +543,18 @@ if (SpeechRec) {
   };
 } else {
   $('#btn-mic').disabled = true;
-  $('#btn-mic').title = ui(
-    'Speech recognition is not supported in this browser',
-    'El reconocimiento de voz no está disponible en este navegador',
-  );
+  $('#btn-mic').title = tr('micTitleUnsupported');
+  $('#btn-mic').setAttribute('aria-label', tr('micTitleUnsupported'));
 }
 
 if (recognition && navigator.brave?.isBrave) {
   navigator.brave.isBrave()
     .then((isBrave) => {
       if (isBrave) {
-        $('#btn-mic').title = ui(
-          'Brave often blocks the browser speech service. If MIC fails, type the clearance or use Chrome/Edge.',
-          'Brave suele bloquear el servicio de voz. Si MIC falla, escriba la autorización o use Chrome/Edge.',
-        );
+        const mic = $('#btn-mic');
+        mic.dataset.braveHint = '1';
+        mic.title = tr('braveHint');
+        mic.setAttribute('aria-label', tr('braveHint'));
       }
     })
     .catch(() => {});
@@ -495,17 +562,11 @@ if (recognition && navigator.brave?.isBrave) {
 
 function startMic() {
   if (!recognition) {
-    showVoiceToast(ui(
-      'Speech recognition is not supported in this browser. Type the clearance instead.',
-      'El reconocimiento de voz no está disponible en este navegador. Escriba la autorización.',
-    ));
+    showVoiceToast(tr('micUnsupported'));
     return;
   }
   if (typeof window.isSecureContext === 'boolean' && !window.isSecureContext) {
-    showVoiceToast(ui(
-      'Microphone access requires HTTPS or localhost. Open the app at http://127.0.0.1:8080.',
-      'El micrófono requiere HTTPS o localhost. Abra la app en http://127.0.0.1:8080.',
-    ));
+    showVoiceToast(tr('micSecure'));
     return;
   }
   recognition.lang = speechLang(settings.lang);
@@ -513,10 +574,7 @@ function startMic() {
   try {
     recognition.start();
   } catch (err) {
-    showVoiceToast(ui(
-      `Could not start speech recognition: ${err?.message || err}`,
-      `No se pudo iniciar el reconocimiento de voz: ${err?.message || err}`,
-    ));
+    showVoiceToast(tr('micStartError', { message: err?.message || err }));
   }
 }
 
@@ -531,10 +589,7 @@ function stopMic() {
 
 function toggleMic() {
   if (!recognition) {
-    showVoiceToast(ui(
-      'Speech recognition is not supported in this browser. Type the clearance instead.',
-      'El reconocimiento de voz no está disponible en este navegador. Escriba la autorización.',
-    ));
+    showVoiceToast(tr('micUnsupported'));
     return;
   }
   if (listening) stopMic();
@@ -550,6 +605,11 @@ function commandFor(ac, cmd) {
 }
 
 // ------------------------------------------------------------------ rendering
+function stopLoop() {
+  if (raf) cancelAnimationFrame(raf);
+  raf = null;
+}
+
 function frame(ts) {
   if (!engine) return;
   const realDt = Math.min(0.1, Math.max(0, (ts - lastTs) / 1000));
@@ -565,6 +625,7 @@ function frame(ts) {
     }
   }
 
+  if (renderer) renderer.selectedId = selectedId;
   renderer.draw();
 
   if (ts - lastUi > 180) {
@@ -577,23 +638,21 @@ function frame(ts) {
     speakNewPilot();
   }
 
-  if (engine.finished && !endShown) showEnd();
+  if (engine.finished) {
+    if (!endShown) showEnd();
+    raf = null;
+    return;
+  }
   raf = requestAnimationFrame(frame);
 }
 
 function updateHeader() {
   if (!engine) return;
   $('#clock').textContent = engine.clock();
-  $('#clock').title = ui(
-    `${Math.ceil(engine.remaining())} s remaining`,
-    `${Math.ceil(engine.remaining())} s restantes`,
-  );
+  $('#clock').title = tr('secondsRemaining', { count: Math.ceil(engine.remaining()) });
   const pending = engine.pendingCalls().length;
   const badge = $('#pending-badge');
-  badge.textContent = ui(
-    `${pending} waiting`,
-    pending === 1 ? '1 en espera' : `${pending} en espera`,
-  );
+  badge.textContent = pending === 1 ? tr('waitingOne') : tr('waiting', { count: pending });
   badge.classList.toggle('alert', pending > 0);
 }
 
@@ -641,6 +700,67 @@ const PHASE_LABEL_ES = {
   done: 'LISTO',
 };
 
+const stripNodes = new Map();
+let stripOrder = '';
+
+function resetStrips() {
+  stripNodes.clear();
+  stripOrder = '';
+  const list = $('#strips');
+  if (list) list.replaceChildren();
+}
+
+function createStripNode() {
+  const el = document.createElement('div');
+  el.className = 'strip';
+  el.tabIndex = 0;
+  el.setAttribute('role', 'button');
+  const top = document.createElement('div');
+  top.className = 'strip-top';
+  const cs = document.createElement('span');
+  cs.className = 'strip-cs';
+  const type = document.createElement('span');
+  type.className = 'strip-type';
+  const status = document.createElement('span');
+  status.className = 'strip-status';
+  top.append(cs, type, status);
+  const sub = document.createElement('div');
+  sub.className = 'strip-sub';
+  const subText = document.createElement('span');
+  sub.append(subText);
+  el.append(top, sub);
+  el._cs = cs;
+  el._type = type;
+  el._status = status;
+  el._sub = subText;
+  return el;
+}
+
+function updateStripNode(el, ac, { sub, phaseLabel, callLabel, selected }) {
+  const sig = [ac.callsign, ac.type.code, ac.wake, ac.kind, phaseLabel, sub, callLabel, selected].join('\u0001');
+  if (el._sig === sig) return;
+  el._sig = sig;
+  el.dataset.id = String(ac.id);
+  el.classList.toggle('arrival', ac.kind === 'arrival');
+  el.classList.toggle('selected', selected);
+  el.setAttribute('aria-label', `${ac.callsign} ${ac.type.code} ${phaseLabel}`);
+  el._cs.textContent = ac.callsign;
+  el._type.textContent = `${ac.type.code} · ${ac.wake}`;
+  el._status.textContent = phaseLabel;
+  el._sub.textContent = sub;
+  let callEl = el.querySelector('.strip-call');
+  if (callLabel) {
+    if (!callEl) {
+      callEl = document.createElement('div');
+      callEl.className = 'strip-call';
+      el.append(callEl);
+    }
+    callEl.textContent = callLabel;
+  } else if (callEl) {
+    callEl.remove();
+  }
+}
+
 function renderStrips() {
   if (!engine) return;
   const list = $('#strips');
@@ -654,34 +774,48 @@ function renderStrips() {
       return pa - pb || a.id - b.id;
     });
 
-  const focusedId = document.activeElement?.closest?.('.strip')?.dataset.id;
   const labels = isEs() ? PHASE_LABEL_ES : PHASE_LABEL;
-  list.innerHTML = rows
-    .map((ac) => {
-      const sub = engine.mode === 'tracon'
-        ? `${Math.round(ac.alt)} ft · ${Math.round(ac.speed)} kt${ac.cleared ? (isEs() ? ' · autorizado' : ' · cleared') : ''}`
-        : ac.kind === 'departure'
-          ? `${ac.gate ? ac.gate.id : '—'} · ${isEs() ? 'PISTA' : 'RWY'} ${engine.geo.runway}`
-          : ac.phase === 'final' || ac.phase === 'goAround'
-            ? `${ac.inboundNm ?? '—'} NM · ${Math.round(ac.alt)} ft`
-            : `${ac.gate ? ac.gate.id : '—'} · ${Math.round(ac.speed / 0.514444)} kt`;
-      const call = ac.call && !ac.call.answered ? ac.call.text : '';
-      const closeFinal = ac.phase === 'final' && Math.abs(ac.x - engine.geo.touchdownX) < 1500;
-      const phaseLabel = closeFinal ? (isEs() ? 'FINAL CORTA' : 'SHORT FINAL') : (labels[ac.phase] || ac.phase);
-      return `<div class="strip ${ac.kind === 'arrival' ? 'arrival' : ''} ${ac.id === selectedId ? 'selected' : ''}" data-id="${ac.id}" tabindex="0" role="button" aria-label="${esc(ac.callsign)} ${esc(ac.type.code)} ${esc(phaseLabel)}">
-        <div class="strip-top">
-          <span class="strip-cs">${esc(ac.callsign)}</span>
-          <span class="strip-type">${esc(ac.type.code)} · ${esc(ac.wake)}</span>
-          <span class="strip-status">${phaseLabel}</span>
-        </div>
-        <div class="strip-sub"><span>${esc(sub)}</span></div>
-        ${call ? `<div class="strip-call">${esc(call)}</div>` : ''}
-      </div>`;
-    })
-    .join('');
+  const focusedId = document.activeElement?.closest?.('.strip')?.dataset.id;
+  const seen = new Set();
+  for (const ac of rows) {
+    let el = stripNodes.get(ac.id);
+    if (!el) {
+      el = createStripNode();
+      stripNodes.set(ac.id, el);
+    }
+    const sub = engine.mode === 'tracon'
+      ? `${Math.round(ac.alt)} ft · ${Math.round(ac.speed)} kt${ac.cleared ? (isEs() ? ' · autorizado' : ' · cleared') : ''}`
+      : ac.kind === 'departure'
+        ? `${ac.gate ? ac.gate.id : '—'} · ${isEs() ? 'PISTA' : 'RWY'} ${engine.geo.runway}`
+        : ac.phase === 'final' || ac.phase === 'goAround'
+          ? `${ac.inboundNm ?? '—'} NM · ${Math.round(ac.alt)} ft`
+          : `${ac.gate ? ac.gate.id : '—'} · ${Math.round(ac.speed / 0.514444)} kt`;
+    const callLabel = ac.call && !ac.call.answered ? ac.call.text : '';
+    const closeFinal = ac.phase === 'final' && Math.abs(ac.x - engine.geo.touchdownX) < 1500;
+    const phaseLabel = closeFinal ? (isEs() ? 'FINAL CORTA' : 'SHORT FINAL') : (labels[ac.phase] || ac.phase);
+    updateStripNode(el, ac, {
+      sub,
+      phaseLabel,
+      callLabel,
+      selected: ac.id === selectedId,
+    });
+    seen.add(ac.id);
+  }
 
-  if (focusedId) {
-    list.querySelector(`.strip[data-id="${focusedId}"]`)?.focus({ preventScroll: true });
+  for (const [id, el] of stripNodes) {
+    if (!seen.has(id)) {
+      el.remove();
+      stripNodes.delete(id);
+    }
+  }
+
+  const nextOrder = rows.map((ac) => ac.id).join(',');
+  if (nextOrder !== stripOrder) {
+    for (const ac of rows) list.append(stripNodes.get(ac.id));
+    stripOrder = nextOrder;
+    if (focusedId) {
+      list.querySelector(`.strip[data-id="${focusedId}"]`)?.focus({ preventScroll: true });
+    }
   }
 
   $('#strip-count').textContent = String(active.length);
@@ -691,7 +825,7 @@ $('#strips').addEventListener('click', (e) => {
   const el = e.target.closest('.strip');
   if (!el) return;
   const id = Number(el.dataset.id);
-  selectedId = selectedId === id ? null : id;
+  setSelected(selectedId === id ? null : id);
   const ac = engine?.activeAircraft().find((a) => a.id === id);
   if (ac) $('#cmd').value = `${ac.callsign} `;
   renderStrips();
@@ -708,6 +842,25 @@ $('#strips').addEventListener('keydown', (e) => {
   el.click();
 });
 
+function radioLineNode(entry) {
+  const who = entry.from === 'ATC' ? (engine.mode === 'tracon' ? 'APP' : 'TWR') : entry.from === 'PILOT' ? 'PILOT' : 'SYS';
+  const cls = entry.from === 'ATC' ? 'atc' : entry.from === 'PILOT' ? 'pilot' : 'sys';
+  const t = `${String(Math.floor(entry.t / 60)).padStart(2, '0')}:${String(Math.floor(entry.t % 60)).padStart(2, '0')}`;
+  const line = document.createElement('div');
+  line.className = `line ${cls}`;
+  const time = document.createElement('span');
+  time.className = 't';
+  time.textContent = t;
+  const speaker = document.createElement('span');
+  speaker.className = 'who';
+  speaker.textContent = who;
+  const text = document.createElement('span');
+  text.className = 'txt';
+  text.textContent = entry.text;
+  line.append(time, speaker, text);
+  return line;
+}
+
 function renderRadio() {
   if (!engine) return;
   if (liveCursor > engine.radio.length) liveCursor = engine.radio.length;
@@ -717,18 +870,17 @@ function renderRadio() {
     if (live) live.textContent = freshPilot.map((r) => r.text).join(' ');
   }
   liveCursor = engine.radio.length;
+
   const box = $('#radio');
   const nearBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 60;
-  const lines = engine.radio.slice(-90);
-  box.innerHTML = lines
-    .map((r) => {
-      const who = r.from === 'ATC' ? (engine.mode === 'tracon' ? 'APP' : 'TWR') : r.from === 'PILOT' ? 'PILOT' : 'SYS';
-      const cls = r.from === 'ATC' ? 'atc' : r.from === 'PILOT' ? 'pilot' : 'sys';
-      const t = `${String(Math.floor(r.t / 60)).padStart(2, '0')}:${String(Math.floor(r.t % 60)).padStart(2, '0')}`;
-      return `<div class="line ${cls}"><span class="t">${t}</span><span class="who">${who}</span><span class="txt">${esc(r.text)}</span></div>`;
-    })
-    .join('');
-  if (nearBottom) box.scrollTop = box.scrollHeight;
+  let appended = false;
+  for (const entry of engine.radio) {
+    if ((entry.seq ?? 0) <= radioCursor) continue;
+    box.append(radioLineNode(entry));
+    radioCursor = entry.seq;
+    appended = true;
+  }
+  if (appended && nearBottom) box.scrollTop = box.scrollHeight;
 }
 
 function renderQuick() {
@@ -808,24 +960,22 @@ function renderAlert() {
   const el = $('#scope-alert');
   const recent = engine.incidents.filter((i) => engine.t - i.t < 6).slice(-1)[0];
   let text = '';
-  if (recent) text = recent.text.toUpperCase();
-  else if (engine.runwayOccupied()) {
-    text = ui(`RUNWAY ${engine.geo.runway} OCCUPIED`, `PISTA ${engine.geo.runway} OCUPADA`);
+  if (recent) {
+    text = recent.text.toUpperCase();
+  } else if (engine.runwayOccupied()) {
+    text = tr('alertRunwayOccupied', { rwy: engine.geo.runway });
   } else {
     const pending = engine.pendingCalls().length;
-    if (pending) {
-      text = ui(
-        `${pending} PILOT CALL${pending > 1 ? 'S' : ''} WAITING`,
-        pending === 1 ? '1 LLAMADA ESPERANDO' : `${pending} LLAMADAS ESPERANDO`,
-      );
-    }
+    if (pending) text = pending === 1 ? tr('alertCallsOne') : tr('alertCalls', { count: pending });
   }
-  if (text) {
-    el.textContent = text;
-    el.classList.remove('hidden');
-  } else {
+  if (text === lastAlertText) return;
+  lastAlertText = text;
+  if (!text) {
     el.classList.add('hidden');
+    return;
   }
+  el.textContent = text;
+  el.classList.remove('hidden');
 }
 
 // ----------------------------------------------------------------- end screen
@@ -834,15 +984,8 @@ function showEnd() {
   const score = engine.score || engine.computeScore();
   $('#grade').textContent = score.grade;
   $('#total').textContent = `${score.total} / 100`;
-  const notes = {
-    'A+': 'Certification-level work.',
-    A: 'Smooth, safe and efficient.',
-    B: 'Solid shift. Sharper sequencing gets you an A.',
-    C: 'Safe enough, but calls waited. Plan ahead.',
-    D: 'Too many errors or delays. Slow the traffic down.',
-    F: 'Safety or service broke down. Rebuild from the basics.',
-  };
-  $('#grade-note').textContent = notes[score.grade] || '';
+  const gradeKeys = { 'A+': 'gradeAp', A: 'gradeA', B: 'gradeB', C: 'gradeC', D: 'gradeD', F: 'gradeF' };
+  $('#grade-note').textContent = tr(gradeKeys[score.grade] || 'gradeF');
 
   $('#score-parts').innerHTML = score.parts
     .map((p) => {
@@ -864,16 +1007,16 @@ function showEnd() {
           return `<li>${t} · ${esc(i.text)}</li>`;
         })
         .join('')
-    : '<li class="none">No incidents. Clean shift.</li>';
+    : `<li class="none">${esc(tr('noIncidents'))}</li>`;
 
   const objectives = score.objectives || [];
   $('#objectives-wrap').classList.toggle('hidden', !objectives.length);
   $('#objectives').innerHTML = objectives
-    .map((o) => `<li class="${o.ok ? 'ok' : 'fail'}">${esc(o.label)} — ${o.ok ? 'met' : 'missed'}</li>`)
+    .map((o) => `<li class="${o.ok ? 'ok' : 'fail'}">${esc(o.label)} — ${o.ok ? esc(tr('met')) : esc(tr('missed'))}</li>`)
     .join('');
 
   const kicker = document.querySelector('#end .modal-kicker');
-  if (kicker) kicker.textContent = `SHIFT DEBRIEF · ${(activeScenario?.name || 'FREE SHIFT').toUpperCase()}`;
+  if (kicker) kicker.textContent = `${tr('debrief')} · ${scenarioName(activeScenario || scenarioById('free'), settings.lang).toUpperCase()}`;
 
   const effectiveDifficulty = engine?.difficulty?.id || settings.difficulty;
   const scenarioId = activeScenario?.id || settings.scenarioId;
@@ -882,7 +1025,8 @@ function showEnd() {
   if (score.total > best) safeSet(key, String(score.total));
 
   $('#end').classList.remove('hidden');
-  requestAnimationFrame(() => $('#btn-again').focus());
+  $('#app').inert = true;
+  requestAnimationFrame(() => $('#end .modal').focus());
 }
 
 // --------------------------------------------------------------------- canvas
@@ -890,7 +1034,7 @@ canvas.addEventListener('pointerdown', (e) => {
   if (!engine) return;
   const rect = canvas.getBoundingClientRect();
   const ac = renderer.pick(e.clientX - rect.left, e.clientY - rect.top);
-  selectedId = ac ? (selectedId === ac.id ? null : ac.id) : null;
+  setSelected(ac ? (selectedId === ac.id ? null : ac.id) : null);
   if (ac && ac.id === selectedId) $('#cmd').value = `${ac.callsign} `;
   renderStrips();
   renderQuick();
@@ -912,12 +1056,19 @@ document.addEventListener('visibilitychange', () => {
   if (document.hidden) {
     paused = true;
     engine.paused = true;
-    $('#btn-pause').textContent = '▶';
+    updatePauseButton();
   }
 });
 
-// PWA: installable, offline shell.
+// PWA: installable, offline shell + update prompt.
+const hadServiceWorkerController = 'serviceWorker' in navigator && !!navigator.serviceWorker.controller;
+
+$('#btn-reload').addEventListener('click', () => window.location.reload());
+
 if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (hadServiceWorkerController) $('#update-toast').classList.remove('hidden');
+  });
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('./sw.js').catch(() => {});
   });
@@ -926,5 +1077,16 @@ if ('serviceWorker' in navigator) {
 // Init
 renderer.resize();
 applyLanguage(settings.lang, { persist: false });
+if (!safeGet('opentower.onboarded')) $('#howto').open = true;
 applyScenario('free');
-requestAnimationFrame(() => $('#btn-start').focus());
+requestAnimationFrame(() => $('#start .modal').focus());
+
+// Test hook, only when explicitly requested with ?debug.
+if (new URLSearchParams(location.search).has('debug')) {
+  window.__opentower = {
+    get engine() { return engine; },
+    get renderer() { return renderer; },
+    isRunning: () => raf !== null,
+    finish: () => engine?.finish(),
+  };
+}

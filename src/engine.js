@@ -52,6 +52,16 @@ const REASONS_ES = {
   'unrecognized instruction': 'instrucción no reconocida',
 };
 
+const SAFETY_LABELS_ES = {
+  runway: 'incursión de pista',
+  air: 'conflicto aéreo',
+  wake: 'estela',
+  deviation: 'desviación/frustrada',
+  lowAlt: 'baja altitud',
+  taxi: 'conflicto de rodaje',
+  unresolved: 'llamada sin resolver',
+};
+
 function mulberry32(seed) {
   let a = seed >>> 0;
   return function rand() {
@@ -84,6 +94,7 @@ export class SimEngine {
     this.paused = false;
     this.aircraft = [];
     this.radio = [];
+    this.radioSeq = 0;
     this.incidents = [];
     this.incidentCooldown = new Map();
     this.nextId = 1;
@@ -125,7 +136,7 @@ export class SimEngine {
 
   // ---------------------------------------------------------------- logging
   log(from, text, freq = 'TWR') {
-    this.radio.push({ t: this.t, from, text, freq });
+    this.radio.push({ seq: ++this.radioSeq, t: this.t, from, text, freq });
     if (this.radio.length > 400) this.radio.splice(0, this.radio.length - 400);
   }
 
@@ -1114,6 +1125,7 @@ export class SimEngine {
   }
 
   computeScore() {
+    const es = this.lang === 'es';
     const active = this.aircraft.filter((a) => !['done', 'removed'].includes(a.phase));
     const counts = {
       runway: this.incidents.filter((i) => i.type === 'runway').length,
@@ -1130,22 +1142,34 @@ export class SimEngine {
       const n = counts[key] ?? 0;
       if (!n) continue;
       safety -= n * weight;
-      safetyNotes.push(`${n} × ${key} (−${n * weight})`);
+      const label = es ? (SAFETY_LABELS_ES[key] || key) : key;
+      safetyNotes.push(`${n} × ${label} (−${n * weight})`);
     }
     safety = Math.max(0, safety);
-    if (!safetyNotes.length) safetyNotes.push('No safety errors.');
+    if (!safetyNotes.length) safetyNotes.push(es ? 'Sin errores de seguridad.' : 'No safety errors.');
 
     const times = this.stats.responseTimes;
-    const avgCredit = times.length ? times.reduce((sum, t) => sum + this.responseCredit(t), 0) / times.length : 1;
+    const avgCredit = times.length ? times.reduce((sum, t) => sum + this.responseCredit(t), 0) / times.length : 0;
     const unanswered = this.stats.unanswered || 0;
-    const comms = Math.max(0, Math.round(30 * avgCredit) - this.stats.clearanceErrors * 2 - this.stats.lateHandoffs);
+    const comms = Math.max(
+      0,
+      Math.round(30 * avgCredit) - this.stats.clearanceErrors * 2 - this.stats.lateHandoffs - unanswered * 2,
+    );
+    const avg = times.length ? Math.round(times.reduce((a, b) => a + b, 0) / times.length) : 0;
+    const good = times.filter((t) => t <= 20).length;
     const commsNotes = [
       times.length
-        ? `${times.filter((t) => t <= 20).length} of ${times.length} calls answered within 20 s (average ${Math.round(times.reduce((a, b) => a + b, 0) / times.length)} s).`
-        : 'No pilot calls answered.',
+        ? (es
+          ? `${good} de ${times.length} llamadas respondidas en 20 s (media ${avg} s).`
+          : `${good} of ${times.length} calls answered within 20 s (average ${avg} s).`)
+        : (es ? 'No se respondió ninguna llamada.' : 'No pilot calls answered.'),
     ];
-    if (unanswered) commsNotes.push(`${unanswered} call(s) left unanswered.`);
-    if (this.stats.clearanceErrors) commsNotes.push(`${this.stats.clearanceErrors} clearance error(s).`);
+    if (unanswered) {
+      commsNotes.push(es ? `${unanswered} llamada(s) sin responder.` : `${unanswered} call(s) left unanswered.`);
+    }
+    if (this.stats.clearanceErrors) {
+      commsNotes.push(es ? `${this.stats.clearanceErrors} error(es) de autorización.` : `${this.stats.clearanceErrors} clearance error(s).`);
+    }
 
     const waiting = active.filter((a) => ['holding', 'crossing', 'final', 'ground', 'parked', 'taxi', 'aborted', 'abortTaxi'].includes(a.phase)).length;
     const denom = this.stats.served + this.stats.failed + waiting * 0.5;
@@ -1153,30 +1177,48 @@ export class SimEngine {
     const departurePenalty = lateDepartures.reduce((sum, w) => sum + Math.min(3, Math.floor((w - 120) / 60) + 1), 0);
     const traffic = Math.max(0, (denom ? Math.round(30 * (this.stats.served / denom)) : 30) - departurePenalty);
     const trafficNotes = [
-      denom ? `${this.stats.served} of ${Math.round(denom * 2) / 2} aircraft handled.` : 'No traffic to handle.',
+      denom
+        ? (es
+          ? `${this.stats.served} de ${Math.round(denom * 2) / 2} aeronaves atendidas.`
+          : `${this.stats.served} of ${Math.round(denom * 2) / 2} aircraft handled.`)
+        : (es ? 'Sin tráfico que atender.' : 'No traffic to handle.'),
     ];
-    if (this.stats.failed) trafficNotes.push(`${this.stats.failed} went around or was left unhandled.`);
-    if (waiting) trafficNotes.push(`${waiting} still waiting at the end.`);
-    if (departurePenalty) trafficNotes.push(`${lateDepartures.length} departure(s) held over 2 min (−${departurePenalty}).`);
+    if (this.stats.failed) {
+      trafficNotes.push(es ? `${this.stats.failed} frustrada(s) o sin atender.` : `${this.stats.failed} went around or was left unhandled.`);
+    }
+    if (waiting) {
+      trafficNotes.push(es ? `${waiting} aún en frecuencia al final.` : `${waiting} still waiting at the end.`);
+    }
+    if (departurePenalty) {
+      trafficNotes.push(es
+        ? `${lateDepartures.length} salida(s) retenida(s) más de 2 min (−${departurePenalty}).`
+        : `${lateDepartures.length} departure(s) held over 2 min (−${departurePenalty}).`);
+    }
 
     const total = Math.round(safety + comms + traffic);
     const grade = total >= 97 ? 'A+' : total >= 90 ? 'A' : total >= 80 ? 'B' : total >= 70 ? 'C' : total >= 60 ? 'D' : 'F';
     const objectives = [];
     const goals = this.scenario?.goals;
     if (goals?.served) {
-      objectives.push({ label: `Handle ${goals.served} aircraft`, ok: this.stats.served >= goals.served });
+      objectives.push({
+        label: es ? `Atender ${goals.served} aeronaves` : `Handle ${goals.served} aircraft`,
+        ok: this.stats.served >= goals.served,
+      });
     }
     if (goals?.maxIncidents != null) {
-      objectives.push({ label: `At most ${goals.maxIncidents} incident(s)`, ok: this.incidents.length <= goals.maxIncidents });
+      objectives.push({
+        label: es ? `Como máximo ${goals.maxIncidents} incidencia(s)` : `At most ${goals.maxIncidents} incident(s)`,
+        ok: this.incidents.length <= goals.maxIncidents,
+      });
     }
     return {
       total,
       grade,
       objectives,
       parts: [
-        { key: 'safety', label: 'Safety', points: safety, max: 40, notes: safetyNotes },
-        { key: 'communication', label: 'Communication', points: comms, max: 30, notes: commsNotes },
-        { key: 'traffic', label: 'Traffic', points: traffic, max: 30, notes: trafficNotes },
+        { key: 'safety', label: es ? 'Seguridad' : 'Safety', points: safety, max: 40, notes: safetyNotes },
+        { key: 'communication', label: es ? 'Comunicación' : 'Communication', points: comms, max: 30, notes: commsNotes },
+        { key: 'traffic', label: es ? 'Tráfico' : 'Traffic', points: traffic, max: 30, notes: trafficNotes },
       ],
       incidents: this.incidents.slice(),
     };

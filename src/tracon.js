@@ -19,6 +19,8 @@ const REASONS_ES = {
   'not established on the approach': 'no está establecido en la aproximación',
   'not in tower airspace yet': 'aún no está en el espacio aéreo de la torre',
   'not a departure': 'no es una salida',
+  'not at the center handoff point yet': 'aún no está en el punto de transferencia a centro',
+  'too close to the runway for a handoff': 'demasiado cerca de la pista para la transferencia',
   'approach clearance is for arrivals': 'la autorización de aproximación es para las llegadas',
   'already handed off': 'ya fue transferido',
   'not on the approach course': 'no está en el curso de aproximación',
@@ -123,11 +125,12 @@ export class TraconEngine {
     this.paused = false;
     this.aircraft = [];
     this.radio = [];
+    this.radioSeq = 0;
     this.incidents = [];
     this.incidentCooldown = new Map();
     this.nextId = 1;
     this.callsigns = new Set();
-    this.stats = { served: 0, failed: 0, clearanceErrors: 0, responseTimes: [], departureWaits: [] };
+    this.stats = { served: 0, failed: 0, clearanceErrors: 0, responseTimes: [], departureWaits: [], unanswered: 0 };
     this.weather = weather;
     const windDir = weather?.windDir ?? (this.rand() < 0.5 ? 270 : 90);
     this.activeRunway = scenario?.runway ?? runwayForWind(windDir);
@@ -152,7 +155,7 @@ export class TraconEngine {
   }
 
   log(from, text, freq = 'APP') {
-    this.radio.push({ t: this.t, from, text, freq });
+    this.radio.push({ seq: ++this.radioSeq, t: this.t, from, text, freq });
     if (this.radio.length > 400) this.radio.splice(0, this.radio.length - 400);
   }
 
@@ -571,6 +574,7 @@ export class TraconEngine {
     if (/(^| )(CONTACT TOWER|CONTACTE (CON )?(LA )?TORRE|CAMBIO (A|CON) (LA )?TORRE|CONTACTAR (LA )?TORRE|LLAME A (LA )?TORRE|CAMBIE A (LA )?TORRE|PASE A (LA )?TORRE)( |$)/.test(t)) {
       if (ac.kind !== 'arrival' || !ac.onApproach) return this.unable(ac, 'not established on the approach');
       const d = Math.hypot(ac.x - this.geo.thresholdX, ac.y);
+      if (d < 1.5 * NM) return this.unable(ac, 'too close to the runway for a handoff');
       if (d > 6 * NM) return this.unable(ac, 'not in tower airspace yet');
       ac.handed = true;
       ac.phase = 'done';
@@ -585,6 +589,8 @@ export class TraconEngine {
 
     if (/(^| )(CONTACT (CENTER|DEPARTURE)|CONTACTE (CON )?(EL )?(CENTRO|SALIDAS)|CAMBIO (A|CON) (EL )?(CENTRO|SALIDAS)|CONTACTAR (EL )?(CENTRO|SALIDAS)|LLAME A (EL )?(CENTRO|SALIDAS)|CAMBIE A (EL )?(CENTRO|SALIDAS)|PASE A (EL )?(CENTRO|SALIDAS))( |$)/.test(t)) {
       if (ac.kind !== 'departure') return this.unable(ac, 'not a departure');
+      const d = Math.hypot(ac.x, ac.y);
+      if (d < 15 * NM) return this.unable(ac, 'not at the center handoff point yet');
       ac.phase = 'done';
       ac.doneAt = this.t;
       this.stats.served += 1;
@@ -725,13 +731,15 @@ export class TraconEngine {
   }
 
   computeScore() {
+    const es = this.lang === 'es';
     const active = this.aircraft.filter((a) => !['done', 'removed'].includes(a.phase));
     const conflicts = this.incidents.filter((i) => i.type === 'air').length;
     const deviations = this.incidents.filter((i) => i.type === 'deviation').length;
     const safety = Math.max(0, 40 - conflicts * 8 - deviations * 4);
     const times = this.stats.responseTimes;
-    const credit = times.length ? times.reduce((sum, t) => sum + this.responseCredit(t), 0) / times.length : 1;
-    const comms = Math.max(0, Math.round(30 * credit) - this.stats.clearanceErrors * 2);
+    const credit = times.length ? times.reduce((sum, t) => sum + this.responseCredit(t), 0) / times.length : 0;
+    const unanswered = this.stats.unanswered || 0;
+    const comms = Math.max(0, Math.round(30 * credit) - this.stats.clearanceErrors * 2 - unanswered * 2);
     const waiting = active.filter((a) => ['cruise', 'approach', 'final', 'departed'].includes(a.phase)).length;
     const denom = this.stats.served + this.stats.failed + waiting * 0.5;
     const traffic = denom ? Math.round(30 * (this.stats.served / denom)) : 30;
@@ -739,22 +747,47 @@ export class TraconEngine {
     const grade = total >= 97 ? 'A+' : total >= 90 ? 'A' : total >= 80 ? 'B' : total >= 70 ? 'C' : total >= 60 ? 'D' : 'F';
     const objectives = [];
     const goals = this.scenario?.goals;
-    if (goals?.served) objectives.push({ label: `Handle ${goals.served} aircraft`, ok: this.stats.served >= goals.served });
-    if (goals?.maxIncidents != null) objectives.push({ label: `At most ${goals.maxIncidents} incident(s)`, ok: this.incidents.length <= goals.maxIncidents });
+    if (goals?.served) {
+      objectives.push({
+        label: es ? `Atender ${goals.served} aeronaves` : `Handle ${goals.served} aircraft`,
+        ok: this.stats.served >= goals.served,
+      });
+    }
+    if (goals?.maxIncidents != null) {
+      objectives.push({
+        label: es ? `Como máximo ${goals.maxIncidents} incidencia(s)` : `At most ${goals.maxIncidents} incident(s)`,
+        ok: this.incidents.length <= goals.maxIncidents,
+      });
+    }
+    const safetyNotes = [
+      conflicts ? (es ? `${conflicts} conflicto(s)` : `${conflicts} conflict(s)`) : (es ? 'Sin pérdidas de separación.' : 'No separation losses.'),
+      deviations ? (es ? `${deviations} frustrada(s)` : `${deviations} go-around(s)`) : '',
+    ].filter(Boolean);
+    const commsNotes = [
+      times.length
+        ? (es
+          ? `${times.filter((x) => x <= 20).length} de ${times.length} llamadas respondidas en 20 s.`
+          : `${times.filter((x) => x <= 20).length} of ${times.length} calls answered within 20 s.`)
+        : (es ? 'No se respondió ninguna llamada.' : 'No pilot calls.'),
+      unanswered ? (es ? `${unanswered} llamada(s) sin responder.` : `${unanswered} call(s) left unanswered.`) : '',
+      this.stats.clearanceErrors ? (es ? `${this.stats.clearanceErrors} error(es) de autorización.` : `${this.stats.clearanceErrors} clearance error(s).`) : '',
+    ].filter(Boolean);
+    const trafficNotes = [
+      denom
+        ? (es
+          ? `${this.stats.served} de ${Math.round(denom * 2) / 2} aeronaves atendidas.`
+          : `${this.stats.served} of ${Math.round(denom * 2) / 2} aircraft handled.`)
+        : (es ? 'Sin tráfico.' : 'No traffic.'),
+      waiting ? (es ? `${waiting} aún en frecuencia.` : `${waiting} still on frequency.`) : '',
+    ].filter(Boolean);
     return {
       total,
       grade,
       objectives,
       parts: [
-        { key: 'safety', label: 'Safety', points: safety, max: 40, notes: [conflicts ? `${conflicts} conflict(s)` : 'No separation losses.', deviations ? `${deviations} go-around(s)` : ''].filter(Boolean) },
-        {
-          key: 'communication',
-          label: 'Communication',
-          points: comms,
-          max: 30,
-          notes: [times.length ? `${times.filter((x) => x <= 20).length} of ${times.length} calls answered within 20 s.` : 'No pilot calls.', this.stats.clearanceErrors ? `${this.stats.clearanceErrors} clearance error(s).` : ''].filter(Boolean),
-        },
-        { key: 'traffic', label: 'Traffic', points: traffic, max: 30, notes: [denom ? `${this.stats.served} of ${Math.round(denom * 2) / 2} aircraft handled.` : 'No traffic.', waiting ? `${waiting} still on frequency.` : ''].filter(Boolean) },
+        { key: 'safety', label: es ? 'Seguridad' : 'Safety', points: safety, max: 40, notes: safetyNotes },
+        { key: 'communication', label: es ? 'Comunicación' : 'Communication', points: comms, max: 30, notes: commsNotes },
+        { key: 'traffic', label: es ? 'Tráfico' : 'Traffic', points: traffic, max: 30, notes: trafficNotes },
       ],
       incidents: this.incidents.slice(),
     };

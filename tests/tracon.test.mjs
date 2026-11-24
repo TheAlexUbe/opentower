@@ -295,3 +295,66 @@ console.log('OpenTower unattended-shift checks passed');
 }
 
 console.log('OpenTower Spanish TRACON checks passed');
+
+// Scoring: unanswered calls get no free credit and subtract points.
+{
+  const e = makeEngine(41);
+  e.aircraft = [];
+  e.stats.responseTimes = [];
+  e.stats.unanswered = 0;
+  const comms = e.computeScore().parts.find((p) => p.key === 'communication');
+  assert.equal(comms.points, 0, 'no answered calls => 0 communication points');
+
+  e.stats.responseTimes = [5, 8, 12];
+  const base = e.computeScore().parts.find((p) => p.key === 'communication').points;
+  e.stats.unanswered = 3;
+  const penalized = e.computeScore().parts.find((p) => p.key === 'communication').points;
+  assert.equal(base - penalized, 6, '2 points per unanswered call');
+  assert.ok(penalized >= 0, 'communication score never goes negative');
+
+  const es = new TraconEngine({
+    duration: 600,
+    seed: 44,
+    difficulty: 'calm',
+    lang: 'es',
+    weather: { windDir: 270, windSpeed: 8, altimeter: '29.95', visibilitySm: 10, live: false },
+  });
+  es.spawnTimer = 9999;
+  es.aircraft = [];
+  const esScore = es.computeScore();
+  assert.equal(esScore.parts[0].label, 'Seguridad');
+  assert.equal(esScore.parts[1].label, 'Comunicación');
+  assert.match(esScore.parts[1].notes[0], /No se respondió ninguna llamada/);
+}
+
+// Handoffs need the aircraft at the right point, not 0.46 NM from the field.
+{
+  const e = makeEngine(42);
+  const dep = e.spawn('departure', { callsign: 'DEP1' });
+  dep.x = 0.46 * NM;
+  dep.y = 0;
+  const tooClose = e.command(`${dep.callsign} contact center`);
+  assert.equal(tooClose.ok, false, 'center handoff refused close to the field');
+
+  dep.x = 16 * NM;
+  dep.y = 0;
+  const ready = e.command(`${dep.callsign} contact center`);
+  assert.equal(ready.ok, true, 'center handoff accepted at 15 NM or more');
+}
+{
+  const e = makeEngine(43);
+  const ac = e.spawn('arrival', { callsign: 'ARR1' });
+  placeOnFinal(e, ac, 0.46);
+  ac.onApproach = true;
+  ac.phase = 'approach';
+  const tooClose = e.command(`${ac.callsign} contact tower`);
+  assert.equal(tooClose.ok, false, 'tower handoff refused inside 1.5 NM');
+
+  placeOnFinal(e, ac, 5);
+  ac.onApproach = true;
+  ac.phase = 'approach';
+  const ready = e.command(`${ac.callsign} contact tower`);
+  assert.equal(ready.ok, true, 'tower handoff accepted inside 6 NM');
+}
+
+console.log('OpenTower score and handoff checks passed');

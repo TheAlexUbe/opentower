@@ -68,7 +68,15 @@ console.log('OpenTower voice-diagnostics checks passed');
 
 // Speech recognition event parsing (interim/final, resultIndex, empty events).
 {
-  const { transcriptsFromSpeechEvent } = await import('../src/voice.js');
+  const { phoneticSpeech, transcriptsFromSpeechEvent } = await import('../src/voice.js');
+  assert.equal(
+    phoneticSpeech('N279NJ, runway 27, contact tower 118.3.'),
+    'November Two Seven Nine November Juliett, runway Two Seven, contact tower One One Eight Point Three.',
+  );
+  assert.equal(phoneticSpeech('SWA123 cleared to land'), 'Sierra Whiskey Alpha One Two Three cleared to land');
+  assert.equal(phoneticSpeech(''), '');
+  assert.equal(phoneticSpeech('no digits here'), 'no digits here');
+
   const interim = Object.assign([{ transcript: 'N123' }], { isFinal: false });
   const final = Object.assign([{ transcript: ' taxi to runway 27' }], { isFinal: true });
   assert.deepEqual(

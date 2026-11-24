@@ -28,6 +28,35 @@ export function speechLang(lang = 'en') {
   return lang === 'es' ? 'es-ES' : 'en-US';
 }
 
+const NATO_WORDS = {
+  A: 'Alpha', B: 'Bravo', C: 'Charlie', D: 'Delta', E: 'Echo', F: 'Foxtrot',
+  G: 'Golf', H: 'Hotel', I: 'India', J: 'Juliett', K: 'Kilo', L: 'Lima',
+  M: 'Mike', N: 'November', O: 'Oscar', P: 'Papa', Q: 'Quebec', R: 'Romeo',
+  S: 'Sierra', T: 'Tango', U: 'Uniform', V: 'Victor', W: 'Whiskey',
+  X: 'Xray', Y: 'Yankee', Z: 'Zulu',
+};
+const DIGIT_WORDS = ['Zero', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine'];
+
+function spellToken(token) {
+  return [...token].map((ch) => {
+    if (ch >= '0' && ch <= '9') return DIGIT_WORDS[Number(ch)];
+    if (ch === '.') return 'Point';
+    return NATO_WORDS[ch] || ch;
+  }).join(' ');
+}
+
+/**
+ * Make callsigns and numbers speakable before handing text to TTS.
+ * N279NJ -> "November Two Seven Nine November Juliett".
+ */
+export function phoneticSpeech(text) {
+  const source = String(text || '');
+  if (!source.trim()) return '';
+  return source
+    .replace(/\b(?:N\d{1,4}[A-Z]{0,2}|[A-Z]{2,3}\d{1,4}[A-Z]{0,2})\b/g, (token) => spellToken(token))
+    .replace(/\b\d+(?:\.\d+)?\b/g, (token) => spellToken(token));
+}
+
 /** Saved radio language wins; otherwise follow a Spanish browser locale. */
 export function preferredRadioLang(stored, browserLang = 'en') {
   if (stored === 'es' || stored === 'en') return stored;

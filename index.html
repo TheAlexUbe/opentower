@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content" />
     <title>OpenTower — free browser ATC simulator</title>
     <meta name="description" content="OpenTower is a free, open-source air traffic control simulator in your browser. Work ground and tower at Copper Mesa with local pilots. No account, no paywall." />
     <meta name="theme-color" content="#05080d" />
@@ -11,12 +11,12 @@
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
-    <div id="app">
+    <div id="app" inert>
       <header class="topbar">
         <div class="brand">
           <span class="brand-mark">◎</span>
           <span class="brand-name">OPEN<strong>TOWER</strong></span>
-          <span class="brand-tag">FREE ATC SIM</span>
+          <span class="brand-tag" data-i18n="brandTag">FREE ATC SIM</span>
         </div>
         <div class="airport-line">
           <span id="airport-name">KXCM · Copper Mesa</span>
@@ -28,10 +28,10 @@
         </div>
         <div class="controls">
           <span id="clock" class="clock">00:00</span>
-          <button id="btn-tts" class="btn ghost" title="Pilot voices">VOICE ON</button>
-          <button id="btn-pause" class="btn ghost" title="Pause">❚❚</button>
-          <button id="btn-speed" class="btn ghost" title="Simulation speed">1×</button>
-          <button id="btn-new" class="btn ghost" title="New shift">NEW</button>
+          <button id="btn-tts" class="btn ghost" title="Pilot voices" aria-label="Pilot voices" data-i18n-aria-label="pilotVoices">VOICE ON</button>
+          <button id="btn-pause" class="btn ghost" title="Pause" aria-label="Pause" data-i18n-title="pause" data-i18n-aria-label="pause">❚❚</button>
+          <button id="btn-speed" class="btn ghost" title="Simulation speed" aria-label="Simulation speed" data-i18n-title="speed" data-i18n-aria-label="speed">1×</button>
+          <button id="btn-new" class="btn ghost" title="New shift" aria-label="New shift" data-i18n="newShift" data-i18n-title="newShift" data-i18n-aria-label="newShift">NEW</button>
         </div>
       </header>
 
@@ -44,13 +44,13 @@
 
         <aside class="side">
           <div class="panel-head">
-            <span>FLIGHT STRIPS</span>
+            <span data-i18n="strips">FLIGHT STRIPS</span>
             <span id="strip-count" class="badge">0</span>
           </div>
           <div id="strips" class="strips"></div>
 
           <div class="panel-head radio-head">
-            <span>RADIO</span>
+            <span data-i18n="radio">RADIO</span>
             <span class="badge" id="pending-badge">0 waiting</span>
           </div>
           <div id="radio" class="radio"></div>
@@ -60,77 +60,77 @@
 
       <footer class="comms">
         <form id="cmd-form" autocomplete="off">
-          <label for="cmd" id="cmd-label">TRANSMIT</label>
-          <input id="cmd" name="cmd" type="text" spellcheck="false" placeholder="e.g. SWA123 taxi to runway 27 via alpha" />
-          <button type="button" id="btn-mic" class="btn mic" title="Push to talk (M)" aria-pressed="false">MIC</button>
-          <button type="submit" id="btn-send" class="btn send">SEND</button>
+          <label for="cmd" id="cmd-label" data-i18n="transmit">TRANSMIT</label>
+          <input id="cmd" name="cmd" type="text" spellcheck="false" placeholder="e.g. SWA123 taxi to runway 27 via alpha" data-i18n-placeholder="cmdPlaceholder" />
+          <button type="button" id="btn-mic" class="btn mic" title="Push to talk (M)" aria-label="Push to talk (M)" aria-pressed="false" data-i18n-aria-label="pushToTalk">MIC</button>
+          <button type="submit" id="btn-send" class="btn send" data-i18n="send">SEND</button>
         </form>
         <div id="quick" class="quick"></div>
       </footer>
       <div id="voice-toast" class="voice-toast hidden" role="status" aria-live="polite"></div>
     </div>
 
+    <div id="update-toast" class="update-toast hidden" role="status" aria-live="polite">
+      <span data-i18n="updateAvailable">A new version is ready.</span>
+      <button type="button" id="btn-reload" class="btn ghost" data-i18n="reload">Reload</button>
+    </div>
+
     <div id="start" class="overlay">
-      <div class="modal start-modal" role="dialog" aria-modal="true" aria-labelledby="start-title">
+      <div class="modal start-modal" role="dialog" aria-modal="true" aria-labelledby="start-title" tabindex="-1">
         <div class="modal-kicker">COPPER MESA · KXCM</div>
         <h1 id="start-title">OPEN<strong>TOWER</strong></h1>
-        <p class="lede">A free browser ATC simulator. Work Ground and Tower at a single-runway field, or take the approach radar, with local pilots that call, read back and occasionally get it wrong.</p>
+        <p class="lede" data-i18n="lede">A free browser ATC simulator. Work Ground and Tower at a single-runway field, or take the approach radar, with local pilots that call, read back and occasionally get it wrong.</p>
         <div class="pick scenario-pick">
-          <span class="pick-label">SCENARIO</span>
+          <span class="pick-label" data-i18n="scenario">SCENARIO</span>
           <select id="scenario-select" class="select"></select>
           <p id="scenario-desc" class="scenario-desc"></p>
         </div>
         <div class="start-grid">
           <div class="pick">
-            <span class="pick-label">SHIFT LENGTH</span>
-            <div class="chips" id="duration-chips">
-              <button type="button" data-duration="300">5 min</button>
-              <button type="button" data-duration="600" class="on">10 min</button>
-              <button type="button" data-duration="1200">20 min</button>
+            <span class="pick-label" data-i18n="shiftLength">SHIFT LENGTH</span>
+            <div class="chips" id="duration-chips" role="group" aria-label="Shift length" data-i18n-aria-label="shiftLengthAria">
+              <button type="button" data-duration="300" aria-pressed="false" data-i18n="duration5">5 min</button>
+              <button type="button" data-duration="600" class="on" aria-pressed="true" data-i18n="duration10">10 min</button>
+              <button type="button" data-duration="1200" aria-pressed="false" data-i18n="duration20">20 min</button>
             </div>
           </div>
           <div class="pick">
-            <span class="pick-label">TRAFFIC</span>
-            <div class="chips" id="difficulty-chips">
-              <button type="button" data-difficulty="calm" class="on">Calm</button>
-              <button type="button" data-difficulty="busy">Busy</button>
-              <button type="button" data-difficulty="rush">Rush</button>
+            <span class="pick-label" data-i18n="traffic">TRAFFIC</span>
+            <div class="chips" id="difficulty-chips" role="group" aria-label="Traffic" data-i18n-aria-label="trafficAria">
+              <button type="button" data-difficulty="calm" class="on" aria-pressed="true" data-i18n="calm">Calm</button>
+              <button type="button" data-difficulty="busy" aria-pressed="false" data-i18n="busy">Busy</button>
+              <button type="button" data-difficulty="rush" aria-pressed="false" data-i18n="rush">Rush</button>
             </div>
           </div>
           <div class="pick">
-            <span class="pick-label">RADIO LANGUAGE · IDIOMA</span>
-            <div class="chips" id="lang-chips">
-              <button type="button" data-lang="en" class="on">English</button>
-              <button type="button" data-lang="es">Español</button>
+            <span class="pick-label" data-i18n="language">LANGUAGE · IDIOMA</span>
+            <div class="chips" id="lang-chips" role="group" aria-label="Language" data-i18n-aria-label="languageAria">
+              <button type="button" data-lang="en" class="on" aria-pressed="true">English</button>
+              <button type="button" data-lang="es" aria-pressed="false">Español</button>
             </div>
           </div>
         </div>
-        <p class="fine">Radio language · Idioma de radio: switches ATC/pilot phraseology, speech recognition and quick commands. Los menús siguen en inglés.</p>
+        <p class="fine" data-i18n="languageNote">Language switches the UI, ATC/pilot phraseology, speech recognition and quick commands.</p>
         <label class="wx-toggle">
           <input type="checkbox" id="live-wx" checked />
-          <span>LIVE WEATHER</span>
-          <span class="muted">KPHX observation via NWS · wind sets the runway</span>
+          <span data-i18n="liveWeather">LIVE WEATHER</span>
+          <span class="muted" data-i18n="liveWeatherHint">KPHX observation via NWS · wind sets the runway</span>
         </label>
         <p id="wx-line" class="wx-line"></p>
-        <button id="btn-start" class="btn primary big">START FREE SHIFT →</button>
-        <p class="fine">No account. No paywall. Runs entirely in your browser. <span id="best-line"></span></p>
-        <p class="fine">Tip: pause and 1× / 2× / 4× speed live in the header. Speech recognition needs Chrome/Edge; typing always works.</p>
-        <div class="howto">
-          <div><b>1</b> Click a strip or aircraft.</div>
-          <div><b>2</b> Type your clearance: <code>N123AB taxi to runway 27</code>.</div>
-          <div><b>3</b> Then: <code>line up and wait</code>, <code>cleared for takeoff</code>, <code>cleared to land</code>, <code>taxi to the ramp</code>.</div>
-          <div><b>4</b> North ramp: <code>cross runway 12</code> at the hold.</div>
-          <div><b>5</b> Approach mode: <code>turn left heading 270</code>, <code>descend 3000</code>, <code>cleared ILS</code>, <code>contact tower</code>.</div>
-          <div><b>6</b> Español: <code>N123AB ruede a la pista 27 por alfa</code>, <code>autorizado para despegar</code>, <code>autorizado para aterrizar</code>.</div>
-          <div><b>7</b> Voice: click <b>MIC</b> (or press <b>M</b>) and speak. Chrome/Edge only; Brave may block speech recognition. <b>V</b> mutes pilot voices.</div>
-        </div>
-        <p class="credit">Open source · MIT · inspired by the tower/ground genre. Not affiliated with any commercial simulator.</p>
+        <button id="btn-start" class="btn primary big" data-i18n="startShift">START FREE SHIFT →</button>
+        <p class="fine"><span data-i18n="noAccount">No account. No paywall. Runs entirely in your browser.</span> <span id="best-line"></span></p>
+        <p class="fine" data-i18n="tip">Tip: pause and 1× / 2× / 4× speed live in the header. Speech recognition needs Chrome/Edge; typing always works.</p>
+        <details id="howto" class="howto">
+          <summary data-i18n="howtoSummary">How to play · 30-second tutorial</summary>
+          <div data-i18n-html="howtoHtml"></div>
+        </details>
+        <p class="credit" data-i18n="credit">Open source · MIT · inspired by the tower/ground genre. Not affiliated with any commercial simulator.</p>
       </div>
     </div>
 
     <div id="end" class="overlay hidden">
-      <div class="modal end-modal" role="dialog" aria-modal="true" aria-label="Shift debrief">
-        <div class="modal-kicker">SHIFT DEBRIEF</div>
+      <div class="modal end-modal" role="dialog" aria-modal="true" aria-label="Shift debrief" data-i18n-aria-label="debrief" tabindex="-1">
+        <div class="modal-kicker" data-i18n="debrief">SHIFT DEBRIEF</div>
         <div class="grade-row">
           <div id="grade" class="grade">A</div>
           <div>
@@ -140,14 +140,14 @@
         </div>
         <div id="score-parts" class="score-parts"></div>
         <div id="objectives-wrap" class="hidden">
-          <div class="incident-head">OBJECTIVES</div>
+          <div class="incident-head" data-i18n="objectives">OBJECTIVES</div>
           <ul id="objectives" class="objectives"></ul>
         </div>
-        <div class="incident-head">INCIDENTS</div>
+        <div class="incident-head" data-i18n="incidents">INCIDENTS</div>
         <ul id="incident-list" class="incident-list"></ul>
         <div class="end-actions">
-          <button id="btn-again" class="btn primary">PLAY AGAIN</button>
-          <button id="btn-menu" class="btn ghost">CHANGE SHIFT</button>
+          <button id="btn-again" class="btn primary" data-i18n="playAgain">PLAY AGAIN</button>
+          <button id="btn-menu" class="btn ghost" data-i18n="changeShift">CHANGE SHIFT</button>
         </div>
       </div>
     </div>

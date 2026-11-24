@@ -1,6 +1,0 @@
-{
-  "worker": {
-    "providerID": "opencode",
-    "modelID": "deepseek-v4.1-flash-free"
-  }
-}
