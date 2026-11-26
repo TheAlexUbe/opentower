@@ -3,10 +3,23 @@ import { AIRPORT, runwayGeometry } from './config.js';
 
 export const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
 
+/**
+ * Look up an airport gate by id.
+ *
+ * @param {string} id - Gate id, for example `N1`.
+ * @returns {object} The matching gate, or the first gate as a fallback.
+ */
 export function gateById(id) {
   return AIRPORT.gates.find((g) => g.id === id) || AIRPORT.gates[0];
 }
 
+/**
+ * Find the first gate not occupied by a parked departure or an arrival.
+ *
+ * @param {Array<object>} aircraft - All aircraft in the current shift.
+ * @param {Array<object>} [gates] - Candidate gates.
+ * @returns {object|null} A free gate, or null when every gate is occupied.
+ */
 export function freeGate(aircraft, gates = AIRPORT.gates) {
   const used = new Set(
     aircraft
@@ -78,6 +91,12 @@ export function inFinalInset(ac, geo) {
   return ac.phase === 'final' && finalApproachDistance(ac, geo) <= FINAL_INSET_RANGE_M;
 }
 
+/**
+ * Runway geometry for the active runway designator.
+ *
+ * @param {'09'|'27'} runway - Active runway.
+ * @returns {object} Threshold, length and surface geometry.
+ */
 export function geoFor(runway) {
   return runwayGeometry(runway);
 }

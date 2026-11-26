@@ -214,6 +214,17 @@ function fill(template, vars) {
   return String(template).replace(/\{(\w+)\}/g, (_, key) => (vars[key] == null ? `{${key}}` : String(vars[key])));
 }
 
+/**
+ * Translate a UI or radio key for the requested language.
+ *
+ * Falls back to English and then to the key itself, and interpolates
+ * `{placeholder}` tokens from `vars`.
+ *
+ * @param {'en'|'es'} lang - Selected radio/UI language.
+ * @param {string} key - Dictionary key.
+ * @param {Record<string, string|number>} [vars] - Interpolation values.
+ * @returns {string} Translated, interpolated text.
+ */
 export function t(lang, key, vars = {}) {
   const dict = STRINGS[lang === 'es' ? 'es' : 'en'];
   const template = dict[key] ?? STRINGS.en[key] ?? key;

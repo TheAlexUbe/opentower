@@ -112,6 +112,21 @@ function compass(deg, lang = 'en') {
   return dirs[Math.round(norm360(deg) / 45) % 8];
 }
 
+/**
+ * Deterministic approach (TRACON) simulation engine.
+ *
+ * Owns radar arrivals, vectors, descent, localizer/ILS capture, separation,
+ * go-arounds and handoffs. Pure logic and Node-testable; it does not touch the
+ * DOM. The canvas renderer is a separate class in this file.
+ *
+ * @param {object} [options]
+ * @param {number} [options.duration=600] - Shift length in simulated seconds.
+ * @param {string} [options.difficulty='calm'] - Difficulty id.
+ * @param {number} [options.seed=1] - PRNG seed; same seed, same traffic.
+ * @param {object|null} [options.weather] - Pre-fetched weather snapshot.
+ * @param {object|null} [options.scenario] - Built-in scenario override.
+ * @param {'en'|'es'} [options.lang='en'] - Radio language.
+ */
 export class TraconEngine {
   constructor({ duration = 600, difficulty = 'calm', seed = 1, weather = null, scenario = null, lang = 'en' } = {}) {
     this.mode = 'tracon';
@@ -839,6 +854,12 @@ const TR_COLORS = {
   white: '#eef4fa',
 };
 
+/**
+ * Canvas renderer for the approach radar scope.
+ *
+ * Owns projection and drawing only. Uses a centred origin with `y` growing
+ * upward (north up), unlike the tower scope renderer.
+ */
 export class TraconRenderer {
   constructor(canvas) {
     this.canvas = canvas;

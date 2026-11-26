@@ -232,6 +232,9 @@ sw.js
 - **Determinista**: PRNG con semilla; misma semilla, mismo tráfico.
 - **Sin dependencias**: módulos ES nativos, sin frameworks ni CDN.
 - **Datos**: aeropuerto, tipos y libreas ficticios o valores típicos.
+- **Capas verificadas**: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) documenta
+  el mapa de capas real y el análisis del grafo (god nodes, ciclos de imports y
+  deuda técnica). El grafo se regenera con `graphify .` y no se commitea.
 
 ## Tests
 
@@ -264,6 +267,19 @@ nube. Es un simulador independiente y original, no un clon.
   de TRACON y separación de estela más detallada.
 - **Más adelante:** SIDs/STARs, más aeropuertos, multiplayer y perfiles de
   dificultad avanzados.
+
+## Contribuir
+
+Las contribuciones son bienvenidas. Lee [`CONTRIBUTING.md`](CONTRIBUTING.md) y
+respeta el [`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md). Abre un issue antes de un
+cambio grande. Para vulnerabilidades usa [`SECURITY.md`](SECURITY.md): no abras
+un issue público.
+
+## Versión
+
+Versión actual: **1.0.0**. El historial está en [`CHANGELOG.md`](CHANGELOG.md) y
+las notas de cada versión en
+[GitHub Releases](https://github.com/TheAlexUbe/opentower/releases).
 
 ## Licencia
 

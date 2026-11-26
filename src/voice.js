@@ -63,6 +63,13 @@ export function preferredRadioLang(stored, browserLang = 'en') {
   return String(browserLang || '').toLowerCase().startsWith('es') ? 'es' : 'en';
 }
 
+/**
+ * Localised, user-facing message for a speech-recognition error code.
+ *
+ * @param {string} code - Browser `SpeechRecognitionErrorEvent.error` value.
+ * @param {'en'|'es'} [lang] - Radio language.
+ * @returns {string} Human-readable guidance; typing always remains available.
+ */
 export function speechErrorMessage(code, lang = 'en') {
   const copy = lang === 'es' ? SPEECH_ERROR_COPY_ES : SPEECH_ERROR_COPY;
   if (Object.prototype.hasOwnProperty.call(copy, code)) {

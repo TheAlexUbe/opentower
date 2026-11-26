@@ -110,18 +110,45 @@ export const SCENARIOS = [
   },
 ];
 
+/**
+ * Look up a built-in scenario by id.
+ *
+ * @param {string} id - Scenario id.
+ * @returns {object} The matching scenario, or the first scenario as a fallback.
+ */
 export function scenarioById(id) {
   return SCENARIOS.find((s) => s.id === id) || SCENARIOS[0];
 }
 
+/**
+ * Localised display name for a scenario.
+ *
+ * @param {object} s - Scenario object.
+ * @param {'en'|'es'} [lang] - Display language.
+ * @returns {string}
+ */
 export function scenarioName(s, lang = 'en') {
   return lang === 'es' ? (s.nameEs || s.name) : s.name;
 }
 
+/**
+ * Localised one-line tagline for a scenario.
+ *
+ * @param {object} s - Scenario object.
+ * @param {'en'|'es'} [lang] - Display language.
+ * @returns {string}
+ */
 export function scenarioTagline(s, lang = 'en') {
   return lang === 'es' ? (s.taglineEs || s.tagline) : s.tagline;
 }
 
+/**
+ * Localised long description for a scenario.
+ *
+ * @param {object} s - Scenario object.
+ * @param {'en'|'es'} [lang] - Display language.
+ * @returns {string}
+ */
 export function scenarioDescription(s, lang = 'en') {
   return lang === 'es' ? (s.descriptionEs || s.description) : s.description;
 }

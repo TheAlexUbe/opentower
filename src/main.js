@@ -1,4 +1,11 @@
-// OpenTower - UI bootstrap and game loop.
+/**
+ * OpenTower UI bootstrap and game loop.
+ *
+ * This is the composition root: it owns DOM access, wires the tower/TRACON
+ * engines to their canvas renderers, manages the radio and speech layers, and
+ * drives the fixed-step simulation clock. Simulation logic lives in
+ * `engine.js` and `tracon.js`; this module only orchestrates it.
+ */
 import { SimEngine } from './engine.js';
 import { Renderer } from './render.js';
 import { TraconEngine, TraconRenderer } from './tracon.js';
@@ -135,6 +142,12 @@ langChips.addEventListener('click', (e) => {
   applyLanguage(b.dataset.lang);
 });
 
+/**
+ * Switch the UI and radio language and refresh every localised surface.
+ *
+ * @param {'en'|'es'} lang - Target language.
+ * @param {{persist?: boolean}} [options] - Persist the choice to localStorage.
+ */
 function applyLanguage(lang, { persist = true } = {}) {
   const next = lang === 'es' ? 'es' : 'en';
   settings.lang = next;
@@ -214,6 +227,10 @@ function showBest() {
     : '';
 }
 
+/**
+ * Start a shift: fetch weather, build the selected scenario, create the
+ * matching engine/renderer pair and start the animation loop.
+ */
 async function startShift() {
   const startBtn = $('#btn-start');
   startBtn.disabled = true;
@@ -383,6 +400,12 @@ $('#cmd-form').addEventListener('submit', (e) => {
   transmit($('#cmd').value);
 });
 
+/**
+ * Submit a controller transmission to the active engine.
+ *
+ * @param {string} text - Raw clearance or radio phrase.
+ * @param {{voice?: boolean}} [options] - Mark the line as microphone input.
+ */
 function transmit(text, { voice = false } = {}) {
   const raw = String(text || '').trim();
   if (!raw || !engine) return;
@@ -610,6 +633,11 @@ function stopLoop() {
   raf = null;
 }
 
+/**
+ * requestAnimationFrame callback: advance the simulation and redraw.
+ *
+ * @param {number} ts - High-resolution frame timestamp in milliseconds.
+ */
 function frame(ts) {
   if (!engine) return;
   const realDt = Math.min(0.1, Math.max(0, (ts - lastTs) / 1000));
