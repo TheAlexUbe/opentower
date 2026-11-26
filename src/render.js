@@ -26,6 +26,13 @@ const COLORS = {
   white: '#eef4fa',
 };
 
+/**
+ * Canvas renderer for the Tower/Ground scope.
+ *
+ * Owns projection and drawing only. Simulation state is read from the
+ * `SimEngine` passed to {@link Renderer#setEngine}; the renderer never mutates
+ * it. Uses a top-left origin with `y` growing downward.
+ */
 export class Renderer {
   constructor(canvas) {
     this.canvas = canvas;
@@ -40,10 +47,19 @@ export class Renderer {
     this.cssH = 0;
   }
 
+  /**
+   * Attach the simulation engine whose aircraft are drawn.
+   *
+   * @param {object|null} engine - A SimEngine instance or null to clear it.
+   */
   setEngine(engine) {
     this.engine = engine;
   }
 
+  /**
+   * Recompute the canvas backing store and world-to-screen projection.
+   * Call after the canvas CSS size changes.
+   */
   resize() {
     const rect = this.canvas.getBoundingClientRect();
     this.dpr = Math.min(window.devicePixelRatio || 1, 2);
@@ -70,6 +86,13 @@ export class Renderer {
     return { x: (px - this.ox) / this.scale, y: (py - this.oy) / this.scale };
   }
 
+  /**
+   * Hit-test the visible aircraft at a canvas position.
+   *
+   * @param {number} px - Canvas x in CSS pixels.
+   * @param {number} py - Canvas y in CSS pixels.
+   * @returns {object|null} The nearest aircraft within 26 px, or null.
+   */
   pick(px, py) {
     if (!this.engine) return null;
     let best = null;
@@ -94,6 +117,7 @@ export class Renderer {
     return { x, y };
   }
 
+  /** Draw one full frame of the tower scope. No-op without an engine. */
   draw() {
     if (!this.engine) return;
     const ctx = this.ctx;

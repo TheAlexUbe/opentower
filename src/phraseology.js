@@ -1,6 +1,16 @@
 // OpenTower - radio phraseology: parse controller text and build readbacks.
 // Standard ATC phraseology; all strings are original.
 
+/**
+ * Normalise a radio transmission for intent parsing.
+ *
+ * Uppercases, strips accents and punctuation, collapses whitespace and maps
+ * Spanish phonetic spellings (`Alfa`, `Julieta`, `Equis`…) to their English
+ * parser tokens so both languages share one grammar.
+ *
+ * @param {string} text - Raw controller or pilot text.
+ * @returns {string} Normalised uppercase phrase.
+ */
 export function normalize(text) {
   return String(text || '')
     .normalize('NFD')
@@ -100,6 +110,13 @@ function spellLooseMixed(text) {
   return out.join(' ');
 }
 
+/**
+ * Spoken form of a runway designator for text-to-speech.
+ *
+ * @param {string} r - Runway designator, for example `27`.
+ * @param {'en'|'es'} [lang] - Radio language.
+ * @returns {string} Words instead of digits (`two seven`, `dos siete`).
+ */
 export function spokenRunway(r, lang = 'en') {
   const v = String(r);
   if (lang === 'es') {
@@ -184,6 +201,16 @@ function runwayIn(t) {
   return null;
 }
 
+/**
+ * Parse a controller transmission into a deterministic intent.
+ *
+ * Accepts English and Spanish and returns the first matching intent (`taxi`,
+ * `takeoff`, `crossRunway`, `clearedIls`, `sayAgain`…). It never executes free
+ * text; the engine `command()` applies the returned intent.
+ *
+ * @param {string} text - Raw controller transmission.
+ * @returns {{type: string, [key: string]: unknown}} Parsed intent.
+ */
 export function parseInstruction(text) {
   const t = normalize(text);
   if (!t) return { type: 'empty' };

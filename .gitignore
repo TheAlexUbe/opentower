@@ -9,5 +9,18 @@ Thumbs.db
 
 # Local agent/Ralph setup (kept on the dev machine only)
 .opencode/
+opencode.json
 AGENT.md
 .ralph-rlm/
+RELEASE_PROMPT.md
+requirements.md
+
+# Local runtime configuration and secrets (never commit)
+.env
+.env.*
+config.local.*
+*.local
+
+# Build, test and coverage output
+coverage/
+dist/

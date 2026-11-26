@@ -81,6 +81,20 @@ const approachSpeed = (current, target, rate, dt) => {
 
 const pad2 = (n) => String(n).padStart(2, '0');
 
+/**
+ * Deterministic Tower/Ground simulation engine.
+ *
+ * Owns the clock, traffic generation, aircraft movement, clearances,
+ * runway/taxi conflicts and scoring. It never touches the DOM.
+ *
+ * @param {object} [options]
+ * @param {number} [options.duration=600] - Shift length in simulated seconds.
+ * @param {string} [options.difficulty='calm'] - Difficulty id.
+ * @param {number} [options.seed=1] - PRNG seed; same seed, same traffic.
+ * @param {object|null} [options.weather] - Pre-fetched weather snapshot.
+ * @param {object|null} [options.scenario] - Built-in scenario override.
+ * @param {'en'|'es'} [options.lang='en'] - Radio language.
+ */
 export class SimEngine {
   constructor({ duration = 600, difficulty = 'calm', seed = 1, weather = null, scenario = null, lang = 'en' } = {}) {
     this.scenario = scenario || null;
