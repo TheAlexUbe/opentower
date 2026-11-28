@@ -1,5 +1,5 @@
 // OpenTower service worker: offline shell for the free simulator.
-const CACHE = 'opentower-v9';
+const CACHE = 'opentower-v10';
 const ASSETS = [
   './',
   './index.html',
@@ -12,12 +12,15 @@ const ASSETS = [
   './src/i18n.js',
   './src/engine.js',
   './src/render.js',
+  './src/scope-renderer.js',
+  './src/tracon-renderer.js',
   './src/main.js',
   './src/weather.js',
   './src/scenarios.js',
   './src/scenario-state.js',
   './src/voice.js',
   './src/tracon.js',
+  './src/ui.js',
   './icon-192.png',
   './icon-512.png',
   './icon-maskable-192.png',

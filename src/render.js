@@ -1,6 +1,7 @@
 // OpenTower - canvas scope renderer.
 import { AIRPORT } from './config.js';
 import { FINAL_INSET_RANGE_M, finalApproachDistance, inFinalInset } from './airport.js';
+import { ScopeRenderer } from './scope-renderer.js';
 
 const WORLD = { x: 1350, y: 820 };
 const PAD = 26;
@@ -33,88 +34,9 @@ const COLORS = {
  * `SimEngine` passed to {@link Renderer#setEngine}; the renderer never mutates
  * it. Uses a top-left origin with `y` growing downward.
  */
-export class Renderer {
+export class Renderer extends ScopeRenderer {
   constructor(canvas) {
-    this.canvas = canvas;
-    this.ctx = canvas.getContext('2d');
-    this.engine = null;
-    this.selectedId = null;
-    this.scale = 1;
-    this.ox = 0;
-    this.oy = 0;
-    this.dpr = 1;
-    this.cssW = 0;
-    this.cssH = 0;
-  }
-
-  /**
-   * Attach the simulation engine whose aircraft are drawn.
-   *
-   * @param {object|null} engine - A SimEngine instance or null to clear it.
-   */
-  setEngine(engine) {
-    this.engine = engine;
-  }
-
-  /**
-   * Recompute the canvas backing store and world-to-screen projection.
-   * Call after the canvas CSS size changes.
-   */
-  resize() {
-    const rect = this.canvas.getBoundingClientRect();
-    this.dpr = Math.min(window.devicePixelRatio || 1, 2);
-    this.cssW = Math.max(320, rect.width);
-    this.cssH = Math.max(260, rect.height);
-    this.canvas.width = Math.round(this.cssW * this.dpr);
-    this.canvas.height = Math.round(this.cssH * this.dpr);
-    const usableW = this.cssW - PAD * 2;
-    const usableH = this.cssH - PAD * 2;
-    this.scale = Math.min(usableW / (WORLD.x * 2), usableH / (WORLD.y * 2));
-    this.ox = this.cssW / 2;
-    this.oy = this.cssH / 2;
-  }
-
-  sx(x) {
-    return this.ox + x * this.scale;
-  }
-
-  sy(y) {
-    return this.oy + y * this.scale;
-  }
-
-  toWorld(px, py) {
-    return { x: (px - this.ox) / this.scale, y: (py - this.oy) / this.scale };
-  }
-
-  /**
-   * Hit-test the visible aircraft at a canvas position.
-   *
-   * @param {number} px - Canvas x in CSS pixels.
-   * @param {number} py - Canvas y in CSS pixels.
-   * @returns {object|null} The nearest aircraft within 26 px, or null.
-   */
-  pick(px, py) {
-    if (!this.engine) return null;
-    let best = null;
-    let bestD = 26;
-    for (const ac of this.engine.activeAircraft()) {
-      const p = this.clampedPos(ac);
-      const d = Math.hypot(p.x - px, p.y - py);
-      if (d < bestD) {
-        bestD = d;
-        best = ac;
-      }
-    }
-    return best;
-  }
-
-  clampedPos(ac) {
-    let x = this.sx(ac.x);
-    let y = this.sy(ac.y);
-    const m = 18;
-    x = Math.max(m, Math.min(this.cssW - m, x));
-    y = Math.max(m, Math.min(this.cssH - m, y));
-    return { x, y };
+    super(canvas, { world: WORLD, pad: PAD, yUp: false });
   }
 
   /** Draw one full frame of the tower scope. No-op without an engine. */
