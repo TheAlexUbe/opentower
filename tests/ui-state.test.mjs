@@ -73,7 +73,7 @@ console.log('OpenTower voice-diagnostics checks passed');
     phoneticSpeech('N279NJ, runway 27, contact tower 118.3.'),
     'November Two Seven Nine November Juliett, runway Two Seven, contact tower One One Eight Point Three.',
   );
-  assert.equal(phoneticSpeech('SWA123 cleared to land'), 'Sierra Whiskey Alpha One Two Three cleared to land');
+  assert.equal(phoneticSpeech('CMX123 cleared to land'), 'Charlie Mike Xray One Two Three cleared to land');
   assert.equal(phoneticSpeech(''), '');
   assert.equal(phoneticSpeech('no digits here'), 'no digits here');
 

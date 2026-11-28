@@ -508,6 +508,7 @@ export class TraconEngine {
 
   detectConflicts() {
     const active = this.aircraft.filter((a) => !['done', 'removed', 'goAround'].includes(a.phase));
+    for (const ac of this.aircraft) ac.conflict = false;
     for (let i = 0; i < active.length; i++) {
       for (let j = i + 1; j < active.length; j++) {
         const a = active[i];
@@ -515,6 +516,8 @@ export class TraconEngine {
         const dNm = Math.hypot(a.x - b.x, a.y - b.y) / NM;
         const dv = Math.abs(a.alt - b.alt);
         if (dNm < 3 && dv < 1000) {
+          a.conflict = true;
+          b.conflict = true;
           this.incident(
             'air',
             this.lang === 'es'
@@ -757,6 +760,7 @@ export class TraconEngine {
     const comms = Math.max(0, Math.round(30 * credit) - this.stats.clearanceErrors * 2 - unanswered * 2);
     const waiting = active.filter((a) => ['cruise', 'approach', 'final', 'departed'].includes(a.phase)).length;
     const denom = this.stats.served + this.stats.failed + waiting * 0.5;
+    const handledTotal = this.stats.served + this.stats.failed + waiting;
     const traffic = denom ? Math.round(30 * (this.stats.served / denom)) : 30;
     const total = Math.round(safety + comms + traffic);
     const grade = total >= 97 ? 'A+' : total >= 90 ? 'A' : total >= 80 ? 'B' : total >= 70 ? 'C' : total >= 60 ? 'D' : 'F';
@@ -788,10 +792,10 @@ export class TraconEngine {
       this.stats.clearanceErrors ? (es ? `${this.stats.clearanceErrors} error(es) de autorización.` : `${this.stats.clearanceErrors} clearance error(s).`) : '',
     ].filter(Boolean);
     const trafficNotes = [
-      denom
+      handledTotal
         ? (es
-          ? `${this.stats.served} de ${Math.round(denom * 2) / 2} aeronaves atendidas.`
-          : `${this.stats.served} of ${Math.round(denom * 2) / 2} aircraft handled.`)
+          ? `${this.stats.served} de ${handledTotal} aeronaves atendidas.`
+          : `${this.stats.served} of ${handledTotal} aircraft handled.`)
         : (es ? 'Sin tráfico.' : 'No traffic.'),
       waiting ? (es ? `${waiting} aún en frecuencia.` : `${waiting} still on frequency.`) : '',
     ].filter(Boolean);
@@ -817,6 +821,11 @@ export class TraconEngine {
 
   activeAircraft() {
     return this.aircraft.filter((a) => !['done', 'removed', 'goAround'].includes(a.phase));
+  }
+
+  /** Aircraft that should remain visible on the radar, including go-arounds. */
+  scopeAircraft() {
+    return this.aircraft.filter((a) => !['done', 'removed'].includes(a.phase));
   }
 
   pendingCalls() {

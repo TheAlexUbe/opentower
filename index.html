@@ -6,7 +6,9 @@
     <title>OpenTower — free browser ATC simulator</title>
     <meta name="description" content="OpenTower is a free, open-source air traffic control simulator in your browser. Work ground and tower at Copper Mesa with local pilots. No account, no paywall." />
     <meta name="theme-color" content="#05080d" />
+    <meta name="color-scheme" content="dark" />
     <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+    <link rel="apple-touch-icon" href="icon-192.png" />
     <link rel="manifest" href="manifest.webmanifest" />
     <link rel="stylesheet" href="styles.css" />
   </head>
@@ -43,17 +45,31 @@
         </section>
 
         <aside class="side">
-          <div class="panel-head">
-            <span data-i18n="strips">FLIGHT STRIPS</span>
-            <span id="strip-count" class="badge">0</span>
+          <div class="mobile-tabs" role="tablist" aria-label="Flight strips and radio" data-i18n-aria-label="panelsAria">
+            <button type="button" id="tab-strips" class="on" role="tab" aria-selected="true" aria-controls="panel-strips">
+              <span data-i18n="strips">FLIGHT STRIPS</span> <b id="tab-strip-count" class="tab-count">0</b>
+            </button>
+            <button type="button" id="tab-radio" role="tab" aria-selected="false" aria-controls="panel-radio">
+              <span data-i18n="radio">RADIO</span> <b id="tab-pending-count" class="tab-count">0</b>
+            </button>
           </div>
-          <div id="strips" class="strips"></div>
 
-          <div class="panel-head radio-head">
-            <span data-i18n="radio">RADIO</span>
-            <span class="badge" id="pending-badge">0 waiting</span>
+          <div class="side-panel active" id="panel-strips" role="tabpanel" aria-labelledby="tab-strips">
+            <div class="panel-head">
+              <span id="strips-heading" data-i18n="strips">FLIGHT STRIPS</span>
+              <span id="strip-count" class="badge">0</span>
+            </div>
+            <div id="strips" class="strips" aria-labelledby="strips-heading"></div>
           </div>
-          <div id="radio" class="radio"></div>
+
+          <div class="side-panel" id="panel-radio" role="tabpanel" aria-labelledby="tab-radio">
+            <div class="panel-head radio-head">
+              <span id="radio-heading" data-i18n="radio">RADIO</span>
+              <span class="badge" id="pending-badge">0 waiting</span>
+            </div>
+            <div id="radio" class="radio" aria-labelledby="radio-heading"></div>
+          </div>
+
           <div id="live-radio" class="sr-only" aria-live="polite" aria-atomic="true"></div>
         </aside>
       </main>
@@ -61,7 +77,7 @@
       <footer class="comms">
         <form id="cmd-form" autocomplete="off">
           <label for="cmd" id="cmd-label" data-i18n="transmit">TRANSMIT</label>
-          <input id="cmd" name="cmd" type="text" spellcheck="false" placeholder="e.g. SWA123 taxi to runway 27 via alpha" data-i18n-placeholder="cmdPlaceholder" />
+          <input id="cmd" name="cmd" type="text" spellcheck="false" placeholder="e.g. CMX123 taxi to runway 27 via alpha" data-i18n-placeholder="cmdPlaceholder" />
           <button type="button" id="btn-mic" class="btn mic" title="Push to talk (M)" aria-label="Push to talk (M)" aria-pressed="false" data-i18n-aria-label="pushToTalk">MIC</button>
           <button type="submit" id="btn-send" class="btn send" data-i18n="send">SEND</button>
         </form>
@@ -81,8 +97,8 @@
         <h1 id="start-title">OPEN<strong>TOWER</strong></h1>
         <p class="lede" data-i18n="lede">A free browser ATC simulator. Work Ground and Tower at a single-runway field, or take the approach radar, with local pilots that call, read back and occasionally get it wrong.</p>
         <div class="pick scenario-pick">
-          <span class="pick-label" data-i18n="scenario">SCENARIO</span>
-          <select id="scenario-select" class="select"></select>
+          <label class="pick-label" for="scenario-select" data-i18n="scenario">SCENARIO</label>
+          <select id="scenario-select" class="select" aria-describedby="scenario-desc"></select>
           <p id="scenario-desc" class="scenario-desc"></p>
         </div>
         <div class="start-grid">

@@ -4,18 +4,19 @@
 
 **Simulador ATC gratuito y open source para navegador.** Trabaja Ground y Tower
 en Copper Mesa (KXCM), cruza la pista 12 del ramal norte, o ponte en el radar de
-aproximación y vectoriza llegadas. Los pilotos llaman, leen de vuelta y cometen
-errores; tú das las autorizaciones por texto o por voz.
+aproximación y vectoriza llegadas. Los pilotos llaman, leen de vuelta y te
+mantienen ocupado; tú das las autorizaciones por texto o por voz.
 
 **Demo:** https://thealexube.github.io/opentower/
 
 - Sin cuenta, sin paywall, sin backend.
 - Todo corre en el navegador (HTML + módulos ES, sin build).
 - Interfaz y radio bilingües (inglés/español), con TTS local y STT Web Speech.
+- Diseño móvil con pestañas STRIPS/RADIO, radar compacto y controles táctiles.
 - METAR real de KPHX (NWS) que fija viento, altímetro y pista activa; si no hay
   red, usa viento simulado.
 - Instalable como PWA y funcional offline.
-- Código original, licencia MIT.
+- Aerolíneas, libreas y nombres comerciales ficticios; código original, MIT.
 
 ![OpenTower tower view](docs/screenshot.png)
 
@@ -67,7 +68,7 @@ aparecen en el debrief.
 
 ## Torre y Ground
 
-1. Elige escenario y pulsa **Start free shift**.
+1. Elige escenario y pulsa **START SHIFT** (o **START APPROACH** en TRACON).
 2. Haz clic en una aeronave o en su *strip*.
 3. Escribe la autorización y pulsa Enter. El indicativo va delante.
 4. La pista activa la decide el viento (09 o 27). Si pides la otra, el piloto
@@ -82,8 +83,8 @@ aparecen en el debrief.
 | Espera | `N123AB hold short of runway 27` |
 | En el punto de espera | `N123AB line up and wait` |
 | Alineado | `N123AB cleared for takeoff` |
-| Llegada en final | `SWA123 cleared to land` |
-| Llegada en final | `SWA123 go around` |
+| Llegada en final | `CMX123 cleared to land` |
+| Llegada en final | `CMX123 go around` |
 | Tras aterrizar | `N123AB taxi to the ramp` |
 | Rodaje | `N123AB continue taxi` |
 | Radio | `N123AB say again`, `N123AB standby`, `N123AB roger` |
@@ -110,8 +111,8 @@ como `Alfa`, `Eco`, `Julieta`, `Equis`, `Yanqui`, `Uve doble`, `Whisky` y
 | Espera | `N123AB alto antes de la pista 27` |
 | En el punto de espera | `N123AB alinéese y espere` |
 | Alineado | `N123AB autorizado para despegar` |
-| Llegada en final | `SWA123 autorizado para aterrizar` |
-| Frustrada | `SWA123 frustrada` |
+| Llegada en final | `CMX123 autorizado para aterrizar` |
+| Frustrada | `CMX123 frustrada` |
 | Tras aterrizar | `N123AB ruede a la plataforma` |
 | Cruce de la 12 | `N123AB cruce la pista 12` |
 | Radio | `N123AB repita`, `N123AB espere`, `N123AB recibido` |
@@ -143,15 +144,15 @@ establecerlas en la final antes de 4 NM.
 
 | Acción | Transmisión |
 |---|---|
-| Viraje | `SWA123 turn left`, `SWA123 turn right` |
-| Rumbo | `SWA123 fly heading 270` |
-| Altitud | `SWA123 descend and maintain 3000` |
-| Ascenso | `SWA123 climb and maintain 6000` |
-| Velocidad | `SWA123 speed 180` |
-| Aproximación | `SWA123 cleared ILS` |
-| Handoff | `SWA123 contact tower` |
-| Salida | `SWA123 contact center` |
-| Frustrada | `SWA123 go around` |
+| Viraje | `CMX123 turn left`, `CMX123 turn right` |
+| Rumbo | `CMX123 fly heading 270` |
+| Altitud | `CMX123 descend and maintain 3000` |
+| Ascenso | `CMX123 climb and maintain 6000` |
+| Velocidad | `CMX123 speed 180` |
+| Aproximación | `CMX123 cleared ILS` |
+| Handoff | `CMX123 contact tower` |
+| Salida | `CMX123 contact center` |
+| Frustrada | `CMX123 go around` |
 
 La aproximación exige estar a menos de 12 NM y dentro del localizador (1,5 NM laterales, 20°); si te desvías más de 2,5 NM, el piloto se va al aire.
 Una vez establecida, la aeronave sigue la senda de 3°. Si no la autorizas antes
@@ -226,9 +227,13 @@ tests/tower-fixes.test.mjs
 tests/tracon.test.mjs
 tests/i18n.test.mjs
 tests/ui-state.test.mjs
+tests/regressions.test.mjs
+tests/pwa.test.mjs
 tests/voice-controller.test.mjs
 tests/architecture.test.mjs
 tests/smoke.spec.js
+tests/mobile.spec.js
+tests/pwa.spec.js
 playwright.config.js
 .github/workflows/ci.yml
 manifest.webmanifest
@@ -243,8 +248,9 @@ sw.js
   `pick` y el hit-testing, respetando los ejes Y opuestos de cada radar.
 - **Determinista**: PRNG con semilla; misma semilla, mismo tráfico.
 - **Sin dependencias de runtime**: módulos ES nativos, sin frameworks ni CDN.
-  Playwright es solo una dependencia de desarrollo para el smoke test.
-- **Datos**: aeropuerto, tipos y libreas ficticios o valores típicos.
+  Playwright es solo una dependencia de desarrollo para la suite de navegador.
+- **Datos**: aeropuerto, aerolíneas, tipos y libreas ficticios; valores de
+  rendimiento típicos.
 - **Capas verificadas**: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) documenta
   el mapa de capas real y las reglas de imports. El grafo se regenera con
   `graphify .` y no se commitea.
@@ -264,8 +270,10 @@ de pista, inset de final, estado de escenarios, puntuación sin llamadas
 respondidas, handoffs por distancia, i18n EN/ES, fraseología fonética en inglés y
 español, radio en español, diagnóstico de voz, TTS fonético, eventos STT,
 arquitectura de módulos y el controlador de voz. Incluye un bot de 300 s para
-detectar bloqueos y un smoke test real: cargar, empezar, generar tráfico,
-vectorizar, autorizar ILS, entregar a torre y aterrizar.
+detectar bloqueos, regresiones de conflictos/señalización, integridad de assets
+PWA, layout móvil en 320×568 y landscape, y smoke tests reales: cargar, empezar,
+generar tráfico, vectorizar, autorizar ILS, entregar a torre, aterrizar y
+recargar la app sin conexión.
 
 ## Alcance
 

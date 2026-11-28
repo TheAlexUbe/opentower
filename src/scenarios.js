@@ -66,8 +66,8 @@ export const SCENARIOS = [
     difficulty: 'calm',
     script: [
       { t: 2, kind: 'departure', type: 'C172', callsign: 'N172OT' },
-      { t: 25, kind: 'arrival', type: 'B77W', callsign: 'FDX77' },
-      { t: 95, kind: 'departure', type: 'B738', callsign: 'SWA88' },
+      { t: 25, kind: 'arrival', type: 'B77W', callsign: 'CFX77' },
+      { t: 95, kind: 'departure', type: 'B738', callsign: 'CMX88' },
     ],
     goals: { served: 3, maxIncidents: 0 },
   },

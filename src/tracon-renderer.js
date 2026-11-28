@@ -129,7 +129,7 @@ export class TraconRenderer extends ScopeRenderer {
 
   drawAircraft() {
     const ctx = this.ctx;
-    for (const ac of this.engine.activeAircraft()) {
+    for (const ac of this.engine.scopeAircraft()) {
       const p = this.clampedPos(ac);
       const off = Math.abs(p.x - this.sx(ac.x)) > 1 || Math.abs(p.y - this.sy(ac.y)) > 1;
       const selected = ac.id === this.selectedId;
@@ -181,44 +181,69 @@ export class TraconRenderer extends ScopeRenderer {
         ctx.stroke();
       }
 
+      if (ac.conflict) {
+        ctx.strokeStyle = TR_COLORS.red;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, 19, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.lineWidth = 1;
+      }
+
       const line2 = `${ac.type.code} ${Math.round(ac.alt)}ft ${Math.round(ac.speed)}kt`;
       const tag = ac.assignedHdg != null || ac.assignedAlt != null
         ? `${pad3(ac.assignedHdg ?? ac.hdg)} / ${Math.round(ac.assignedAlt ?? ac.alt)}`
         : ac.phase.toUpperCase();
-      ctx.fillStyle = 'rgba(5,8,13,0.72)';
-      ctx.fillRect(p.x + 10, p.y - 13, 118, 24);
-      ctx.textAlign = 'left';
-      ctx.font = 'bold 11px ui-monospace, monospace';
-      ctx.fillStyle = color;
-      ctx.fillText(ac.callsign, p.x + 13, p.y - 3);
-      ctx.font = '10px ui-monospace, monospace';
-      ctx.fillStyle = TR_COLORS.dim;
-      ctx.fillText(line2, p.x + 13, p.y + 9);
-      ctx.fillStyle = TR_COLORS.dim;
-      ctx.fillText(tag, p.x + 13, p.y + 20);
+      if (this.compact) {
+        ctx.fillStyle = 'rgba(5,8,13,0.78)';
+        ctx.fillRect(p.x + 7, p.y - 10, 96, 18);
+        ctx.textAlign = 'left';
+        ctx.font = 'bold 9px ui-monospace, monospace';
+        ctx.fillStyle = color;
+        ctx.fillText(ac.callsign, p.x + 9, p.y - 3);
+        ctx.font = '8px ui-monospace, monospace';
+        ctx.fillStyle = TR_COLORS.dim;
+        ctx.fillText(`${Math.round(ac.alt)}ft ${tag}`, p.x + 9, p.y + 6);
+      } else {
+        ctx.fillStyle = 'rgba(5,8,13,0.72)';
+        ctx.fillRect(p.x + 10, p.y - 13, 118, 24);
+        ctx.textAlign = 'left';
+        ctx.font = 'bold 11px ui-monospace, monospace';
+        ctx.fillStyle = color;
+        ctx.fillText(ac.callsign, p.x + 13, p.y - 3);
+        ctx.font = '10px ui-monospace, monospace';
+        ctx.fillStyle = TR_COLORS.dim;
+        ctx.fillText(line2, p.x + 13, p.y + 9);
+        ctx.fillStyle = TR_COLORS.dim;
+        ctx.fillText(tag, p.x + 13, p.y + 20);
+      }
     }
   }
 
   drawHud() {
     const ctx = this.ctx;
+    const compact = this.compact;
     ctx.textAlign = 'right';
-    ctx.font = 'bold 11px ui-monospace, monospace';
+    ctx.font = compact ? 'bold 9px ui-monospace, monospace' : 'bold 11px ui-monospace, monospace';
     ctx.fillStyle = TR_COLORS.green;
     ctx.fillText(
       this.engine.lang === 'es'
         ? `APP ${this.engine.appFreq} · PISTA ${this.engine.geo.runway}`
         : `APP ${this.engine.appFreq} · RWY ${this.engine.geo.runway}`,
-      this.cssW - 16,
-      22,
+      this.cssW - 12,
+      compact ? 18 : 22,
     );
     ctx.fillStyle = TR_COLORS.dim;
-    ctx.font = '10px ui-monospace, monospace';
+    ctx.font = compact ? '8px ui-monospace, monospace' : '10px ui-monospace, monospace';
     ctx.fillText(
-      `${this.engine.lang === 'es' ? 'VIENTO' : 'WIND'} ${pad3(this.engine.wind.dir)}/${pad2(this.engine.wind.speed)} · ATIS ${this.engine.atis}`,
-      this.cssW - 16,
-      38,
+      compact
+        ? `${pad3(this.engine.wind.dir)}/${pad2(this.engine.wind.speed)} A${this.engine.atis}`
+        : `${this.engine.lang === 'es' ? 'VIENTO' : 'WIND'} ${pad3(this.engine.wind.dir)}/${pad2(this.engine.wind.speed)} · ATIS ${this.engine.atis}`,
+      this.cssW - 12,
+      compact ? 30 : 38,
     );
     ctx.textAlign = 'left';
-    ctx.fillText('5/10/15/20 NM', 18, this.cssH - 16);
+    ctx.font = compact ? '8px ui-monospace, monospace' : '10px ui-monospace, monospace';
+    ctx.fillText('5/10/15/20 NM', 14, this.cssH - 12);
   }
 }

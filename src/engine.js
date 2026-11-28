@@ -10,17 +10,15 @@ import { findAddressee, parseInstruction, phrase } from './phraseology.js';
 import { runwayForWind } from './weather.js';
 
 const TAXI_BOOST = 2.0;
+const FINAL_SEPARATION_M = 1.5 * 1852; // do not clear a departure into a short final
 const GROUND_PHASES = new Set(['parked', 'taxi', 'holding', 'crossing', 'lineup', 'lined_up', 'takeoff', 'rollout', 'abort', 'aborted', 'abortTaxi', 'ground', 'taxiRamp']);
 const RUNWAY_PHASES = new Set(['lineup', 'lined_up', 'takeoff', 'rollout', 'abort', 'aborted', 'abortTaxi']);
 
 const SAFETY_WEIGHTS = {
   runway: 12,
-  air: 8,
   wake: 5,
   deviation: 4,
-  lowAlt: 5,
   taxi: 2,
-  unresolved: 2,
 };
 
 // Spanish controller reasons. The English string stays the internal key so
@@ -54,12 +52,9 @@ const REASONS_ES = {
 
 const SAFETY_LABELS_ES = {
   runway: 'incursión de pista',
-  air: 'conflicto aéreo',
   wake: 'estela',
   deviation: 'desviación/frustrada',
-  lowAlt: 'baja altitud',
   taxi: 'conflicto de rodaje',
-  unresolved: 'llamada sin resolver',
 };
 
 function mulberry32(seed) {
@@ -773,7 +768,7 @@ export class SimEngine {
 
   trafficOnFinal(exclude) {
     return this.aircraft.find(
-      (a) => a !== exclude && a.phase === 'final' && Math.abs(a.x - this.geo.touchdownX) < 900,
+      (a) => a !== exclude && a.phase === 'final' && Math.abs(a.x - this.geo.touchdownX) < FINAL_SEPARATION_M,
     );
   }
 
@@ -812,7 +807,11 @@ export class SimEngine {
         const a = ground[i];
         const b = ground[j];
         const d = dist(a, b);
-        a.conflict = b.conflict = d < 55 && Math.abs(a.y - b.y) < 14 && a.speed > 1 && b.speed > 1;
+        const inConflict = d < 55 && Math.abs(a.y - b.y) < 14 && a.speed > 1 && b.speed > 1;
+        if (inConflict) {
+          a.conflict = true;
+          b.conflict = true;
+        }
         if (d < 9 && a.speed > 0.8 && b.speed > 0.8) {
           this.incident(
             'taxi',
@@ -896,10 +895,12 @@ export class SimEngine {
     if (ins.type === 'empty') return { ok: false };
     this.answer(ac);
 
+    const groundPhase = ['parked', 'taxi', 'taxiRamp', 'ground', 'aborted', 'abortTaxi'].includes(ac.phase);
+    const freq = groundPhase ? 'GND' : 'TWR';
     const result = this.apply(ac, ins);
-    if (result.atc) this.log('ATC', result.atc, ac.phase === 'ground' || ac.phase === 'parked' ? 'GND' : 'TWR');
-    if (result.pilot) this.log('PILOT', result.pilot, ac.phase === 'ground' || ac.phase === 'parked' ? 'GND' : 'TWR');
-    if (result.system) this.log('SYS', result.system, 'TWR');
+    if (result.atc) this.log('ATC', result.atc, freq);
+    if (result.pilot) this.log('PILOT', result.pilot, freq);
+    if (result.system) this.log('SYS', result.system, freq);
     return result;
   }
 
@@ -1143,12 +1144,9 @@ export class SimEngine {
     const active = this.aircraft.filter((a) => !['done', 'removed'].includes(a.phase));
     const counts = {
       runway: this.incidents.filter((i) => i.type === 'runway').length,
-      air: this.incidents.filter((i) => i.type === 'air').length,
       wake: this.incidents.filter((i) => i.type === 'wake').length,
       deviation: this.incidents.filter((i) => i.type === 'deviation').length,
-      lowAlt: this.incidents.filter((i) => i.type === 'lowAlt').length,
       taxi: this.incidents.filter((i) => i.type === 'taxi').length,
-      unresolved: this.incidents.filter((i) => i.type === 'unresolved').length,
     };
     let safety = 40;
     const safetyNotes = [];
@@ -1187,14 +1185,15 @@ export class SimEngine {
 
     const waiting = active.filter((a) => ['holding', 'crossing', 'final', 'ground', 'parked', 'taxi', 'aborted', 'abortTaxi'].includes(a.phase)).length;
     const denom = this.stats.served + this.stats.failed + waiting * 0.5;
+    const handledTotal = this.stats.served + this.stats.failed + waiting;
     const lateDepartures = this.stats.departureWaits.filter((w) => w > 120);
     const departurePenalty = lateDepartures.reduce((sum, w) => sum + Math.min(3, Math.floor((w - 120) / 60) + 1), 0);
     const traffic = Math.max(0, (denom ? Math.round(30 * (this.stats.served / denom)) : 30) - departurePenalty);
     const trafficNotes = [
-      denom
+      handledTotal
         ? (es
-          ? `${this.stats.served} de ${Math.round(denom * 2) / 2} aeronaves atendidas.`
-          : `${this.stats.served} of ${Math.round(denom * 2) / 2} aircraft handled.`)
+          ? `${this.stats.served} de ${handledTotal} aeronaves atendidas.`
+          : `${this.stats.served} of ${handledTotal} aircraft handled.`)
         : (es ? 'Sin tráfico que atender.' : 'No traffic to handle.'),
     ];
     if (this.stats.failed) {

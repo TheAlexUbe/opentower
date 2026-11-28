@@ -31,6 +31,7 @@ async function transmit(page, text) {
 test('core loop: load, start, spawn, vector and hand off to tower', async ({ page }) => {
   await boot(page, 'tracon');
   await setFourTimes(page);
+  await expect(page.locator('#cmd')).toHaveAttribute('placeholder', /turn left/);
 
   const callsign = await page.evaluate(() => window.__opentower.engine.spawn('arrival')?.callsign);
   expect(callsign).toBeTruthy();
@@ -99,6 +100,15 @@ test('core loop: load, start, spawn, vector and hand off to tower', async ({ pag
 test('tower loop: clear an arrival to land and touch down', async ({ page }) => {
   await boot(page, 'free');
   await setFourTimes(page);
+  await expect(page.locator('#cmd')).toHaveAttribute('placeholder', /taxi to runway/);
+
+  const ground = await page.evaluate(() => ({
+    callsign: window.__opentower.engine.aircraft.find((a) => a.kind === 'departure')?.callsign,
+    runway: window.__opentower.engine.geo.runway,
+  }));
+  expect(ground.callsign).toBeTruthy();
+  await transmit(page, `${ground.callsign} taxi to runway ${ground.runway}`);
+  await expect(page.locator('#radio .line.atc .who').first()).toHaveText('GND');
 
   const callsign = await page.evaluate(() => window.__opentower.engine.spawn('arrival')?.callsign);
   expect(callsign).toBeTruthy();

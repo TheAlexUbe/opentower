@@ -12,7 +12,7 @@ function stepUntil(engine, predicate, maxSeconds = 120, dt = 0.1) {
 }
 
 // --- phraseology -----------------------------------------------------------
-assert.equal(parseInstruction('SWA123 taxi to runway 27 via alpha').type, 'taxi');
+assert.equal(parseInstruction('CMX123 taxi to runway 27 via alpha').type, 'taxi');
 assert.equal(parseInstruction('N123AB hold short of runway 27').type, 'holdShort');
 assert.equal(parseInstruction('N123AB line up and wait runway 09').type, 'lineUp');
 assert.equal(parseInstruction('N123AB cleared for takeoff').type, 'takeoff');
@@ -22,17 +22,17 @@ assert.equal(parseInstruction('N123AB taxi via bravo').viaBravo, true);
 assert.equal(parseInstruction('N123AB say again').type, 'sayAgain');
 
 const fakeAircraft = [
-  { callsign: 'SWA123', spoken: 'SOUTHWEST 123' },
+  { callsign: 'CMX123', spoken: 'COPPER MESA 123' },
   { callsign: 'N45AB', spoken: 'N45AB' },
 ];
-assert.equal(findAddressee('southwest 123 taxi to runway 27', fakeAircraft).aircraft.callsign, 'SWA123');
+assert.equal(findAddressee('copper mesa 123 taxi to runway 27', fakeAircraft).aircraft.callsign, 'CMX123');
 assert.equal(findAddressee('N45AB hold short', fakeAircraft).aircraft.callsign, 'N45AB');
 assert.equal(findAddressee('nobody here', fakeAircraft).aircraft, null);
 
 // --- phonetic alphabet callsigns and runway words --------------------------
 const phoneticAircraft = [
   { callsign: 'N123AB', spoken: 'N123AB' },
-  { callsign: 'SWA123', spoken: 'SOUTHWEST 123' },
+  { callsign: 'CMX123', spoken: 'COPPER MESA 123' },
   { callsign: 'N101AB', spoken: 'N101AB' },
   { callsign: 'N9XZ', spoken: 'N9XZ' },
 ];
@@ -49,12 +49,12 @@ assert.equal(
   'N123AB',
 );
 assert.equal(
-  findAddressee('Sierra whiskey alpha one two three, taxi to runway 27', phoneticAircraft).aircraft.callsign,
-  'SWA123',
+  findAddressee('Charlie mike xray one two three, taxi to runway 27', phoneticAircraft).aircraft.callsign,
+  'CMX123',
 );
 assert.equal(
-  findAddressee('Southwest one two three, taxi to runway 27', phoneticAircraft).aircraft.callsign,
-  'SWA123',
+  findAddressee('Copper Mesa one two three, taxi to runway 27', phoneticAircraft).aircraft.callsign,
+  'CMX123',
 );
 assert.equal(
   findAddressee('N one oh one alpha bravo, cleared to land', phoneticAircraft).aircraft.callsign,

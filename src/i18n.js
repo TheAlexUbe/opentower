@@ -5,17 +5,20 @@ export const STRINGS = {
   en: {
     appTitle: 'OpenTower — free browser ATC simulator',
     brandTag: 'FREE ATC SIM',
-    lede: 'A free browser ATC simulator. Work Ground and Tower at a single-runway field, or take the approach radar, with local pilots that call, read back and occasionally get it wrong.',
+    lede: 'A free browser ATC simulator. Work Ground and Tower at a single-runway field, or take the approach radar, with local pilots that call, read back and keep you busy.',
     newShift: 'NEW',
     strips: 'FLIGHT STRIPS',
     radio: 'RADIO',
+    panelsAria: 'Flight strips and radio panels',
     waiting: '{count} waiting',
     scopeTower: 'Click an aircraft · type a clearance · Enter to transmit',
     scopeTracon: 'Click a target · vector, descend, clear the approach · Enter to transmit',
     scopeTowerAria: 'Airport radar scope',
     scopeTraconAria: 'Approach radar scope',
     transmit: 'TRANSMIT',
-    cmdPlaceholder: 'e.g. SWA123 taxi to runway 27 via alpha',
+    cmdPlaceholder: 'e.g. CMX123 taxi to the active runway via alpha',
+    cmdPlaceholderTower: 'e.g. CMX123 taxi to runway {runway} via alpha',
+    cmdPlaceholderTracon: 'e.g. CMX123 turn left heading 270',
     send: 'SEND',
     pause: 'Pause',
     resume: 'Resume',
@@ -41,13 +44,15 @@ export const STRINGS = {
     liveWeatherHint: 'KPHX observation via NWS · wind sets the runway',
     languageNote: 'Language switches the UI, ATC/pilot phraseology, speech recognition and quick commands.',
     startShift: 'START FREE SHIFT →',
+    startScenario: 'START SHIFT →',
+    startApproach: 'START APPROACH →',
     fetching: 'FETCHING LIVE WEATHER…',
     noAccount: 'No account. No paywall. Runs entirely in your browser.',
     tip: 'Tip: pause and 1× / 2× / 4× speed live in the header. Speech recognition needs Chrome/Edge; typing always works.',
     howtoSummary: 'How to play · 30-second tutorial',
     howtoHtml: `<ol>
       <li>Click a strip or aircraft.</li>
-      <li>Type the callsign and clearance: <code>N123AB taxi to runway 27</code>.</li>
+      <li>Type the callsign and clearance: <code>N123AB taxi to the active runway</code>.</li>
       <li>At the hold: <code>line up and wait</code>, then <code>cleared for takeoff</code>.</li>
       <li>Inbound: <code>cleared to land</code>; after landing <code>taxi to the ramp</code>.</li>
       <li>North ramp: <code>cross runway 12</code>.</li>
@@ -108,17 +113,20 @@ export const STRINGS = {
   es: {
     appTitle: 'OpenTower — simulador ATC gratuito para navegador',
     brandTag: 'SIM ATC GRATIS',
-    lede: 'Simulador ATC gratuito para navegador. Trabaja Ground y Tower en un campo de pista única, o toma el radar de aproximación, con pilotos locales que llaman, leen de vuelta y a veces se equivocan.',
+    lede: 'Simulador ATC gratuito para navegador. Trabaja Ground y Tower en un campo de pista única, o toma el radar de aproximación, con pilotos locales que llaman, leen de vuelta y te mantienen ocupado.',
     newShift: 'NUEVO',
     strips: 'FICHAS DE VUELO',
     radio: 'RADIO',
+    panelsAria: 'Paneles de fichas de vuelo y radio',
     waiting: '{count} en espera',
     scopeTower: 'Haga clic en una aeronave · escriba una autorización · Enter para transmitir',
     scopeTracon: 'Haga clic en un objetivo · vectorice, descienda, autorice la aproximación · Enter para transmitir',
     scopeTowerAria: 'Pantalla de radar del aeropuerto',
     scopeTraconAria: 'Pantalla de radar de aproximación',
     transmit: 'TRANSMITIR',
-    cmdPlaceholder: 'p. ej. SWA123 ruede a la pista 27 por alfa',
+    cmdPlaceholder: 'p. ej. CMX123 ruede a la pista activa por alfa',
+    cmdPlaceholderTower: 'p. ej. CMX123 ruede a la pista {runway} por alfa',
+    cmdPlaceholderTracon: 'p. ej. CMX123 gire a la izquierda rumbo 270',
     send: 'ENVIAR',
     pause: 'Pausar',
     resume: 'Reanudar',
@@ -144,13 +152,15 @@ export const STRINGS = {
     liveWeatherHint: 'Observación KPHX vía NWS · el viento fija la pista',
     languageNote: 'El idioma cambia la interfaz, la fraseología ATC/piloto, el reconocimiento de voz y los comandos rápidos.',
     startShift: 'EMPEZAR TURNO →',
+    startScenario: 'EMPEZAR TURNO →',
+    startApproach: 'EMPEZAR APROXIMACIÓN →',
     fetching: 'OBTENIENDO METEO EN VIVO…',
     noAccount: 'Sin cuenta. Sin paywall. Todo corre en tu navegador.',
     tip: 'Pausa y velocidad 1× / 2× / 4× en la cabecera. El reconocimiento de voz necesita Chrome/Edge; escribir siempre funciona.',
     howtoSummary: 'Cómo jugar · tutorial de 30 segundos',
     howtoHtml: `<ol>
       <li>Haz clic en una ficha o aeronave.</li>
-      <li>Escribe indicativo y autorización: <code>N123AB ruede a la pista 27</code>.</li>
+      <li>Escribe indicativo y autorización: <code>N123AB ruede a la pista activa</code>.</li>
       <li>En el punto de espera: <code>alinéese y espere</code>, luego <code>autorizado para despegar</code>.</li>
       <li>Llegada: <code>autorizado para aterrizar</code>; después <code>ruede a la plataforma</code>.</li>
       <li>Ramal norte: <code>cruce la pista 12</code>.</li>

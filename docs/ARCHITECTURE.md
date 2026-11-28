@@ -4,7 +4,7 @@ OpenTower is a deterministic, single-page air traffic control simulation that
 runs entirely in the browser. There are no LLM agents, no backend and no
 service layer.
 
-This document describes the module boundaries enforced by the v1.0.0 release
+This document describes the module boundaries enforced by the v1.1.0 release
 refactor. The rules are covered by `tests/architecture.test.mjs`.
 
 ## Layer map
@@ -69,6 +69,10 @@ rate and lets the user change simulation speed without breaking determinism.
 - `tests/smoke.spec.js` runs Chromium through Playwright. It boots the real
   page, starts a shift, spawns aircraft, issues a vector, clears an ILS,
   hands off to tower and lands an arrival in the tower scope.
+- `tests/mobile.spec.js` verifies the 320 px portrait and short-landscape
+  layouts, the STRIPS/RADIO tabs, touch targets and the in-viewport CTA.
+- `tests/pwa.spec.js` reloads the app with the browser offline to prove the
+  service-worker shell works. `tests/pwa.test.mjs` checks asset/cache integrity.
 - `npm test` runs the Node suite. `npm run test:e2e` runs the browser suite.
   CI runs both.
 

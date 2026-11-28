@@ -19,6 +19,7 @@ Requirements: Node.js 20 or newer and any static file server.
 git clone https://github.com/TheAlexUbe/opentower.git
 cd opentower
 npm test
+npm run test:e2e   # Chromium smoke/mobile/offline tests
 python3 -m http.server 8080   # open http://127.0.0.1:8080
 ```
 
@@ -32,17 +33,19 @@ Every change must keep the suite green:
 
 ```bash
 npm test
-node --check src/*.js tests/*.mjs sw.js
+npm run test:e2e
+npm run lint
 ```
 
-Add a regression test for every bug fix and for new simulation behaviour. Tests
-are plain Node scripts with assertions; they must not need a browser or network.
+Add a regression test for every bug fix and for new simulation behaviour. The
+Node suite uses plain assertions and must not need a browser or network; the
+Playwright suite covers real browser layout, PWA/offline and the control loop.
 
 ## Code style
 
 - Native ES modules, two-space indentation, semicolons, single quotes.
 - Keep `src/engine.js` and the `TraconEngine` class free of DOM access.
-- Escape dynamic HTML in `src/main.js` with `esc()`.
+- Escape dynamic HTML in `src/ui.js` with `esc()`.
 - Keep the seeded PRNG deterministic: same seed, same traffic.
 - Add every user-facing string to both `en` and `es` in `src/i18n.js`.
 - Preserve the existing ATC phraseology and readback style.

@@ -255,7 +255,7 @@ console.log('OpenTower unattended-shift checks passed');
   });
   e.spawnTimer = 9999;
   e.aircraft = [];
-  const arrival = e.spawn('arrival', { callsign: 'SWA321' });
+  const arrival = e.spawn('arrival', { callsign: 'CMX321' });
   assert.ok(arrival, 'Spanish arrival spawned');
   assert.ok(/millas al/i.test(arrival.call.text), 'Spanish check-in call');
 
@@ -287,7 +287,7 @@ console.log('OpenTower unattended-shift checks passed');
   assert.ok(/contacte torre/i.test(handoff.atc));
   assert.ok(/cambio a torre/i.test(handoff.pilot));
 
-  const second = e.spawn('arrival', { callsign: 'SWA322' });
+  const second = e.spawn('arrival', { callsign: 'CMX322' });
   const refused = e.command(`${second.callsign} contacte torre`);
   assert.equal(refused.ok, false, 'handoff refused before established');
   assert.ok(/imposible/i.test(refused.atc));

@@ -149,7 +149,7 @@ export function createApp({
       persistLanguage: (next) => safeSet('opentower.lang', next),
       onApply: (next) => {
         populateScenarioOptions();
-        showBest();
+        applyScenario(settings.scenarioId);
         voice.setLanguage(next);
         voice.updateTtsButton();
         if (engine) {
@@ -182,11 +182,22 @@ export function createApp({
     for (const b of container.querySelectorAll('button')) b.disabled = locked;
   }
 
+  function startButtonKey(s = scenarioById(settings.scenarioId)) {
+    if (s.id === 'free') return 'startShift';
+    return s.mode === 'tracon' ? 'startApproach' : 'startScenario';
+  }
+
+  function updateStartButton(s = scenarioById(settings.scenarioId)) {
+    const button = $('#btn-start');
+    if (button) button.textContent = tr(startButtonKey(s));
+  }
+
   function applyScenario(id) {
     const s = scenarioById(id);
     settings.scenarioId = s.id;
     scenarioSelect.value = s.id;
     $('#scenario-desc').textContent = scenarioDescription(s, settings.lang);
+    updateStartButton(s);
     const eff = effectiveScenarioSettings(s, {
       duration: settings.freeDuration,
       difficulty: settings.freeDifficulty,
@@ -217,6 +228,38 @@ export function createApp({
       : '';
   }
 
+  // Mobile-only tabs keep the scope usable without splitting the side panel
+  // into two tiny scroll areas. Desktop keeps both panels visible via CSS.
+  const sideTabs = [$('#tab-strips'), $('#tab-radio')].filter(Boolean);
+  const sidePanels = { strips: $('#panel-strips'), radio: $('#panel-radio') };
+
+  function setSideTab(name) {
+    const next = name === 'radio' ? 'radio' : 'strips';
+    for (const tab of sideTabs) {
+      const active = tab.id === `tab-${next}`;
+      tab.classList.toggle('on', active);
+      tab.setAttribute('aria-selected', String(active));
+      tab.tabIndex = active ? 0 : -1;
+    }
+    for (const [key, panel] of Object.entries(sidePanels)) {
+      panel?.classList.toggle('active', key === next);
+    }
+  }
+
+  for (const tab of sideTabs) {
+    tab.addEventListener('click', () => setSideTab(tab.id === 'tab-radio' ? 'radio' : 'strips'));
+    tab.addEventListener('keydown', (e) => {
+      if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+      e.preventDefault();
+      const current = sideTabs.indexOf(tab);
+      const delta = e.key === 'ArrowRight' ? 1 : -1;
+      const next = sideTabs[(current + delta + sideTabs.length) % sideTabs.length];
+      next.focus();
+      setSideTab(next.id === 'tab-radio' ? 'radio' : 'strips');
+    });
+  }
+  setSideTab('strips');
+
   /**
    * Start a shift: fetch weather, build the selected scenario, create the
    * matching engine/renderer pair and start the animation loop.
@@ -229,7 +272,7 @@ export function createApp({
       startBtn.textContent = tr('fetching');
       weather = await fetchWeather({ timeoutMs: 3000 });
     }
-    startBtn.textContent = tr('startShift');
+    startBtn.textContent = tr(startButtonKey());
     startBtn.disabled = false;
 
     activeScenario = scenarioById(settings.scenarioId);
@@ -258,6 +301,7 @@ export function createApp({
     $('#btn-speed').textContent = '1×';
     updatePauseButton();
     $('#active-rwy').textContent = engine.geo.runway;
+    $('#cmd').placeholder = tr(engine.mode === 'tracon' ? 'cmdPlaceholderTracon' : 'cmdPlaceholderTower', { runway: engine.geo.runway });
     $('#wind-line').textContent = `${tr('wind')} ${String(engine.wind.dir).padStart(3, '0')}/${String(engine.wind.speed).padStart(2, '0')} · A${engine.altimeter}`;
     if (engine.mode === 'tracon') {
       $('#airport-name').textContent = 'COPPER APPROACH · APP';
@@ -492,6 +536,9 @@ export function createApp({
     const badge = $('#pending-badge');
     badge.textContent = pending === 1 ? tr('waitingOne') : tr('waiting', { count: pending });
     badge.classList.toggle('alert', pending > 0);
+    const tabPending = $('#tab-pending-count');
+    if (tabPending) tabPending.textContent = String(pending);
+    $('#tab-radio')?.classList.toggle('alert', pending > 0);
   }
 
   const PHASE_LABEL = {
@@ -657,6 +704,8 @@ export function createApp({
     }
 
     $('#strip-count').textContent = String(active.length);
+    const tabStrips = $('#tab-strip-count');
+    if (tabStrips) tabStrips.textContent = String(active.length);
   }
 
   $('#strips').addEventListener('click', (e) => {
@@ -681,7 +730,11 @@ export function createApp({
   });
 
   function radioLineNode(entry) {
-    const who = entry.from === 'ATC' ? (engine.mode === 'tracon' ? 'APP' : 'TWR') : entry.from === 'PILOT' ? 'PILOT' : 'SYS';
+    const freq = String(entry.freq || '').toUpperCase();
+    const fallback = engine.mode === 'tracon' ? 'APP' : 'TWR';
+    const who = entry.from === 'ATC'
+      ? (['GND', 'TWR', 'APP'].includes(freq) ? freq : fallback)
+      : entry.from === 'PILOT' ? 'PILOT' : 'SYS';
     const cls = entry.from === 'ATC' ? 'atc' : entry.from === 'PILOT' ? 'pilot' : 'sys';
     const t = `${String(Math.floor(entry.t / 60)).padStart(2, '0')}:${String(Math.floor(entry.t % 60)).padStart(2, '0')}`;
     const line = doc.createElement('div');

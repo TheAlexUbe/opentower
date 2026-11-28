@@ -88,6 +88,7 @@ export class Renderer extends ScopeRenderer {
   drawAirport() {
     const ctx = this.ctx;
     const s = this.scale;
+    const compact = this.compact;
 
     // Apron / terminal block.
     ctx.fillStyle = '#0d141d';
@@ -143,10 +144,12 @@ export class Renderer extends ScopeRenderer {
       ctx.stroke();
       ctx.strokeStyle = COLORS.dim;
       ctx.lineWidth = 1;
-      ctx.fillStyle = COLORS.dim;
-      ctx.font = '10px ui-monospace, monospace';
-      ctx.textAlign = 'center';
-      ctx.fillText(c.id, this.sx(c.x), this.sy(AIRPORT.alphaArrY) + 18);
+      if (!compact) {
+        ctx.fillStyle = COLORS.dim;
+        ctx.font = '10px ui-monospace, monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText(c.id, this.sx(c.x), this.sy(AIRPORT.alphaArrY) + 18);
+      }
     }
 
     // Taxiway Bravo, crossing inactive runway 12/30 to the north ramp.
@@ -156,10 +159,12 @@ export class Renderer extends ScopeRenderer {
     ctx.moveTo(this.sx(AIRPORT.crossing.x), this.sy(-660));
     ctx.lineTo(this.sx(AIRPORT.crossing.x), this.sy(AIRPORT.alphaArrY));
     ctx.stroke();
-    ctx.fillStyle = COLORS.dim;
-    ctx.font = '10px ui-monospace, monospace';
-    ctx.textAlign = 'left';
-    ctx.fillText('BRAVO', this.sx(AIRPORT.crossing.x) + 10, this.sy(-560));
+    if (!compact) {
+      ctx.fillStyle = COLORS.dim;
+      ctx.font = '10px ui-monospace, monospace';
+      ctx.textAlign = 'left';
+      ctx.fillText('BRAVO', this.sx(AIRPORT.crossing.x) + 10, this.sy(-560));
+    }
 
     // Gate spurs and gates.
     for (const gate of AIRPORT.gates) {
@@ -177,10 +182,12 @@ export class Renderer extends ScopeRenderer {
       ctx.rect(this.sx(gate.x) - 9, this.sy(gate.y) - 9, 18, 18);
       ctx.fill();
       ctx.stroke();
-      ctx.fillStyle = COLORS.dim;
-      ctx.font = '9px ui-monospace, monospace';
-      ctx.textAlign = 'center';
-      ctx.fillText(gate.id, this.sx(gate.x), this.sy(gate.y) + 22);
+      if (!compact) {
+        ctx.fillStyle = COLORS.dim;
+        ctx.font = '9px ui-monospace, monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText(gate.id, this.sx(gate.x), this.sy(gate.y) + 22);
+      }
     }
 
     // Inactive crossing runway 12/30 (north of the main field).
@@ -360,24 +367,39 @@ export class Renderer extends ScopeRenderer {
         ctx.strokeStyle = COLORS.red;
         ctx.lineWidth = 2;
         ctx.beginPath();
-        ctx.arc(p.x, p.y, 18, 0, Math.PI * 2);
+        ctx.arc(p.x, p.y, this.compact ? 14 : 18, 0, Math.PI * 2);
         ctx.stroke();
       }
 
-      // Data block.
+      // Data block. Phones get a smaller tag so targets stay distinguishable.
       const status = this.statusFor(ac);
       const line2 = ac.phase === 'final' || ac.phase === 'goAround' || ac.phase === 'airborne'
         ? `${ac.type.code} ${Math.round(ac.alt)}ft ${Math.round(ac.speed / 0.514444)}kt`
         : `${ac.type.code} ${status}`;
-      ctx.fillStyle = 'rgba(5,8,13,0.72)';
-      ctx.fillRect(p.x + 10, p.y - 13, 132, 24);
-      ctx.textAlign = 'left';
-      ctx.font = 'bold 11px ui-monospace, monospace';
-      ctx.fillStyle = selected ? COLORS.white : color;
-      ctx.fillText(ac.callsign, p.x + 13, p.y - 3);
-      ctx.font = '10px ui-monospace, monospace';
-      ctx.fillStyle = COLORS.dim;
-      ctx.fillText(line2, p.x + 13, p.y + 9);
+      if (this.compact) {
+        const compactTag = ac.phase === 'final' || ac.phase === 'goAround' || ac.phase === 'airborne'
+          ? `${ac.type.code} ${Math.round(ac.alt)}ft`
+          : status;
+        ctx.fillStyle = 'rgba(5,8,13,0.78)';
+        ctx.fillRect(p.x + 7, p.y - 10, 94, 18);
+        ctx.textAlign = 'left';
+        ctx.font = 'bold 9px ui-monospace, monospace';
+        ctx.fillStyle = selected ? COLORS.white : color;
+        ctx.fillText(ac.callsign, p.x + 9, p.y - 3);
+        ctx.font = '8px ui-monospace, monospace';
+        ctx.fillStyle = COLORS.dim;
+        ctx.fillText(compactTag, p.x + 9, p.y + 6);
+      } else {
+        ctx.fillStyle = 'rgba(5,8,13,0.72)';
+        ctx.fillRect(p.x + 10, p.y - 13, 132, 24);
+        ctx.textAlign = 'left';
+        ctx.font = 'bold 11px ui-monospace, monospace';
+        ctx.fillStyle = selected ? COLORS.white : color;
+        ctx.fillText(ac.callsign, p.x + 13, p.y - 3);
+        ctx.font = '10px ui-monospace, monospace';
+        ctx.fillStyle = COLORS.dim;
+        ctx.fillText(line2, p.x + 13, p.y + 9);
+      }
     }
   }
 
@@ -407,6 +429,15 @@ export class Renderer extends ScopeRenderer {
     const geo = this.engine.geo;
     const arrivals = this.engine.activeAircraft().filter((a) => inFinalInset(a, geo));
     if (!arrivals.length) return;
+    if (this.compact) {
+      const ctx = this.ctx;
+      const nearest = Math.min(...arrivals.map((a) => finalApproachDistance(a, geo))) / 1852;
+      ctx.fillStyle = COLORS.amber;
+      ctx.font = '9px ui-monospace, monospace';
+      ctx.textAlign = 'right';
+      ctx.fillText(`FINAL ${geo.runway} · ${nearest.toFixed(1)} NM${arrivals.length > 1 ? ` +${arrivals.length - 1}` : ''}`, this.cssW - 12, this.cssH - 38);
+      return;
+    }
     const ctx = this.ctx;
     const w = 226;
     const h = 150;
@@ -503,30 +534,34 @@ export class Renderer extends ScopeRenderer {
     const ctx = this.ctx;
     const g = this.engine.geo;
     const es = this.engine.lang === 'es';
+    const compact = this.compact;
     ctx.textAlign = 'right';
-    ctx.font = 'bold 11px ui-monospace, monospace';
+    ctx.font = compact ? 'bold 9px ui-monospace, monospace' : 'bold 11px ui-monospace, monospace';
     ctx.fillStyle = this.engine.runwayOccupied() ? COLORS.red : COLORS.green;
     ctx.fillText(
       this.engine.runwayOccupied()
         ? (es ? `PISTA ${g.runway} OCUPADA` : `RWY ${g.runway} OCCUPIED`)
         : (es ? `PISTA ${g.runway} LIBRE` : `RWY ${g.runway} CLEAR`),
-      this.cssW - 16,
-      22,
+      this.cssW - 12,
+      compact ? 18 : 22,
     );
     ctx.fillStyle = COLORS.dim;
-    ctx.font = '10px ui-monospace, monospace';
+    ctx.font = compact ? '8px ui-monospace, monospace' : '10px ui-monospace, monospace';
     ctx.fillText(
-      `${es ? 'VIENTO' : 'WIND'} ${String(this.engine.wind.dir).padStart(3, '0')} / ${this.engine.wind.speed}KT · ATIS ${this.engine.atis}`,
-      this.cssW - 16,
-      38,
+      compact
+        ? `${String(this.engine.wind.dir).padStart(3, '0')}/${this.engine.wind.speed} A${this.engine.atis}`
+        : `${es ? 'VIENTO' : 'WIND'} ${String(this.engine.wind.dir).padStart(3, '0')} / ${this.engine.wind.speed}KT · ATIS ${this.engine.atis}`,
+      this.cssW - 12,
+      compact ? 30 : 38,
     );
     const wakeLeft = 120 - (this.engine.t - this.engine.lastHeavy.t);
     if (wakeLeft > 0 && wakeLeft <= 120) {
       ctx.fillStyle = COLORS.amber;
+      ctx.font = compact ? '8px ui-monospace, monospace' : '10px ui-monospace, monospace';
       ctx.fillText(
-        `${es ? 'SEPARACIÓN DE ESTELA' : 'WAKE SEPARATION'} ${Math.ceil(wakeLeft)}s`,
-        this.cssW - 16,
-        54,
+        `${es ? 'ESTELA' : 'WAKE'} ${Math.ceil(wakeLeft)}s`,
+        this.cssW - 12,
+        compact ? 42 : 54,
       );
     }
   }

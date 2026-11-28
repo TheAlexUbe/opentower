@@ -12,31 +12,31 @@ const kt = (v) => v * KT;
  * wake: L (light), M (medium), H (heavy), J (super).
  */
 export const TYPES = {
-  C172: { code: 'C172', name: 'Cessna 172', category: 'piston', wake: 'L', taxi: kt(14), rotate: kt(55), climb: kt(75), final: kt(65), cruise: kt(110), climbFpm: 700, descentFpm: 600, accel: 3.0, decel: 4.0, lengthFt: 27 },
-  C182: { code: 'C182', name: 'Cessna 182', category: 'piston', wake: 'L', taxi: kt(14), rotate: kt(60), climb: kt(85), final: kt(70), cruise: kt(135), climbFpm: 900, descentFpm: 700, accel: 3.0, decel: 4.0, lengthFt: 29 },
-  SR22: { code: 'SR22', name: 'Cirrus SR22', category: 'piston', wake: 'L', taxi: kt(15), rotate: kt(70), climb: kt(105), final: kt(80), cruise: kt(170), climbFpm: 1100, descentFpm: 800, accel: 4.0, decel: 4.0, lengthFt: 26 },
-  PA28: { code: 'PA28', name: 'Piper Archer', category: 'piston', wake: 'L', taxi: kt(14), rotate: kt(60), climb: kt(80), final: kt(70), cruise: kt(125), climbFpm: 800, descentFpm: 650, accel: 3.0, decel: 4.0, lengthFt: 24 },
-  PA34: { code: 'PA34', name: 'Piper Seneca', category: 'piston', wake: 'L', taxi: kt(14), rotate: kt(70), climb: kt(95), final: kt(85), cruise: kt(180), climbFpm: 1200, descentFpm: 800, accel: 3.0, decel: 4.0, lengthFt: 29 },
-  BE20: { code: 'BE20', name: 'King Air 200', category: 'turboprop', wake: 'L', taxi: kt(15), rotate: kt(95), climb: kt(130), final: kt(100), cruise: kt(250), climbFpm: 1800, descentFpm: 1200, accel: 4.0, decel: 4.0, lengthFt: 43 },
-  PC12: { code: 'PC12', name: 'Pilatus PC-12', category: 'turboprop', wake: 'L', taxi: kt(15), rotate: kt(85), climb: kt(120), final: kt(95), cruise: kt(270), climbFpm: 1500, descentFpm: 1100, accel: 4.0, decel: 4.0, lengthFt: 47 },
-  C25A: { code: 'C25A', name: 'Citation CJ2', category: 'jet', wake: 'L', taxi: kt(16), rotate: kt(105), climb: kt(160), final: kt(115), cruise: kt(380), climbFpm: 3000, descentFpm: 1500, accel: 4.5, decel: 3.5, lengthFt: 47 },
-  E75L: { code: 'E75L', name: 'Embraer 175', category: 'jet', wake: 'M', taxi: kt(16), rotate: kt(135), climb: kt(180), final: kt(130), cruise: kt(430), climbFpm: 2800, descentFpm: 1500, accel: 4.5, decel: 3.5, lengthFt: 104 },
-  CRJ9: { code: 'CRJ9', name: 'CRJ-900', category: 'jet', wake: 'M', taxi: kt(16), rotate: kt(140), climb: kt(185), final: kt(135), cruise: kt(440), climbFpm: 2800, descentFpm: 1500, accel: 4.5, decel: 3.5, lengthFt: 119 },
-  B738: { code: 'B738', name: 'Boeing 737-800', category: 'jet', wake: 'M', taxi: kt(16), rotate: kt(148), climb: kt(190), final: kt(140), cruise: kt(450), climbFpm: 2500, descentFpm: 1500, accel: 4.5, decel: 3.5, lengthFt: 129 },
-  A320: { code: 'A320', name: 'Airbus A320', category: 'jet', wake: 'M', taxi: kt(16), rotate: kt(145), climb: kt(185), final: kt(138), cruise: kt(450), climbFpm: 2500, descentFpm: 1500, accel: 4.5, decel: 3.5, lengthFt: 123 },
-  B77W: { code: 'B77W', name: 'Boeing 777-300ER', category: 'jet', wake: 'H', taxi: kt(17), rotate: kt(165), climb: kt(200), final: kt(150), cruise: kt(480), climbFpm: 2200, descentFpm: 1500, accel: 4.0, decel: 3.5, lengthFt: 242 },
-  A388: { code: 'A388', name: 'Airbus A380', category: 'jet', wake: 'J', taxi: kt(17), rotate: kt(170), climb: kt(205), final: kt(152), cruise: kt(480), climbFpm: 2000, descentFpm: 1500, accel: 3.8, decel: 3.5, lengthFt: 239 },
+  C172: { code: 'C172', name: 'Light single', category: 'piston', wake: 'L', taxi: kt(14), rotate: kt(55), climb: kt(75), final: kt(65), cruise: kt(110), climbFpm: 700, descentFpm: 600, accel: 3.0, decel: 4.0, lengthFt: 27 },
+  C182: { code: 'C182', name: 'Light single', category: 'piston', wake: 'L', taxi: kt(14), rotate: kt(60), climb: kt(85), final: kt(70), cruise: kt(135), climbFpm: 900, descentFpm: 700, accel: 3.0, decel: 4.0, lengthFt: 29 },
+  SR22: { code: 'SR22', name: 'High-performance single', category: 'piston', wake: 'L', taxi: kt(15), rotate: kt(70), climb: kt(105), final: kt(80), cruise: kt(170), climbFpm: 1100, descentFpm: 800, accel: 4.0, decel: 4.0, lengthFt: 26 },
+  PA28: { code: 'PA28', name: 'Light single', category: 'piston', wake: 'L', taxi: kt(14), rotate: kt(60), climb: kt(80), final: kt(70), cruise: kt(125), climbFpm: 800, descentFpm: 650, accel: 3.0, decel: 4.0, lengthFt: 24 },
+  PA34: { code: 'PA34', name: 'Light twin', category: 'piston', wake: 'L', taxi: kt(14), rotate: kt(70), climb: kt(95), final: kt(85), cruise: kt(180), climbFpm: 1200, descentFpm: 800, accel: 3.0, decel: 4.0, lengthFt: 29 },
+  BE20: { code: 'BE20', name: 'Turboprop twin', category: 'turboprop', wake: 'L', taxi: kt(15), rotate: kt(95), climb: kt(130), final: kt(100), cruise: kt(250), climbFpm: 1800, descentFpm: 1200, accel: 4.0, decel: 4.0, lengthFt: 43 },
+  PC12: { code: 'PC12', name: 'Single turboprop', category: 'turboprop', wake: 'L', taxi: kt(15), rotate: kt(85), climb: kt(120), final: kt(95), cruise: kt(270), climbFpm: 1500, descentFpm: 1100, accel: 4.0, decel: 4.0, lengthFt: 47 },
+  C25A: { code: 'C25A', name: 'Light jet', category: 'jet', wake: 'L', taxi: kt(16), rotate: kt(105), climb: kt(160), final: kt(115), cruise: kt(380), climbFpm: 3000, descentFpm: 1500, accel: 4.5, decel: 3.5, lengthFt: 47 },
+  E75L: { code: 'E75L', name: 'Regional jet', category: 'jet', wake: 'M', taxi: kt(16), rotate: kt(135), climb: kt(180), final: kt(130), cruise: kt(430), climbFpm: 2800, descentFpm: 1500, accel: 4.5, decel: 3.5, lengthFt: 104 },
+  CRJ9: { code: 'CRJ9', name: 'Regional jet', category: 'jet', wake: 'M', taxi: kt(16), rotate: kt(140), climb: kt(185), final: kt(135), cruise: kt(440), climbFpm: 2800, descentFpm: 1500, accel: 4.5, decel: 3.5, lengthFt: 119 },
+  B738: { code: 'B738', name: 'Narrowbody jet', category: 'jet', wake: 'M', taxi: kt(16), rotate: kt(148), climb: kt(190), final: kt(140), cruise: kt(450), climbFpm: 2500, descentFpm: 1500, accel: 4.5, decel: 3.5, lengthFt: 129 },
+  A320: { code: 'A320', name: 'Narrowbody jet', category: 'jet', wake: 'M', taxi: kt(16), rotate: kt(145), climb: kt(185), final: kt(138), cruise: kt(450), climbFpm: 2500, descentFpm: 1500, accel: 4.5, decel: 3.5, lengthFt: 123 },
+  B77W: { code: 'B77W', name: 'Widebody heavy', category: 'jet', wake: 'H', taxi: kt(17), rotate: kt(165), climb: kt(200), final: kt(150), cruise: kt(480), climbFpm: 2200, descentFpm: 1500, accel: 4.0, decel: 3.5, lengthFt: 242 },
+  A388: { code: 'A388', name: 'Super-heavy jet', category: 'jet', wake: 'J', taxi: kt(17), rotate: kt(170), climb: kt(205), final: kt(152), cruise: kt(480), climbFpm: 2000, descentFpm: 1500, accel: 3.8, decel: 3.5, lengthFt: 239 },
 };
 
 export const AIRLINES = [
-  { code: 'SWA', name: 'Southwest', types: ['B738'] },
-  { code: 'DAL', name: 'Delta', types: ['A320', 'B738'] },
-  { code: 'AAL', name: 'American', types: ['B738', 'A320'] },
-  { code: 'UAL', name: 'United', types: ['B738', 'A320'] },
-  { code: 'ASA', name: 'Alaska', types: ['B738'] },
-  { code: 'JBU', name: 'JetBlue', types: ['A320'] },
-  { code: 'SKW', name: 'SkyWest', types: ['E75L', 'CRJ9'] },
-  { code: 'FDX', name: 'FedEx', types: ['B77W'] },
+  { code: 'CMX', name: 'Copper Mesa', types: ['B738', 'A320'] },
+  { code: 'CMA', name: 'Copper Mountain', types: ['B738'] },
+  { code: 'RGA', name: 'Ridge Regional', types: ['E75L', 'CRJ9'] },
+  { code: 'CFX', name: 'Copper Freight', types: ['B77W'] },
+  { code: 'SKA', name: 'Skyline', types: ['A320'] },
+  { code: 'NVA', name: 'North Valley', types: ['B738'] },
+  { code: 'AMA', name: 'Alta Mesa', types: ['A320'] },
+  { code: 'MTA', name: 'Mesa Transit', types: ['B738'] },
 ];
 
 export const GA_TYPES = ['C172', 'C182', 'SR22', 'PA28', 'PA34', 'BE20', 'PC12'];

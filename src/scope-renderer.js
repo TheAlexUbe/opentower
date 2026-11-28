@@ -47,8 +47,8 @@ export class ScopeRenderer {
   resize() {
     const rect = this.canvas.getBoundingClientRect();
     this.dpr = Math.min(window.devicePixelRatio || 1, 2);
-    this.cssW = Math.max(320, rect.width);
-    this.cssH = Math.max(260, rect.height);
+    this.cssW = Math.max(280, rect.width);
+    this.cssH = Math.max(200, rect.height);
     this.canvas.width = Math.round(this.cssW * this.dpr);
     this.canvas.height = Math.round(this.cssH * this.dpr);
     const usableW = this.cssW - this.pad * 2;
@@ -71,6 +71,11 @@ export class ScopeRenderer {
       x: (px - this.ox) / this.scale,
       y: (this.yUp ? -1 : 1) * ((py - this.oy) / this.scale),
     };
+  }
+
+  /** True on narrow screens where label density must be reduced. */
+  get compact() {
+    return this.cssW > 0 && this.cssW < 720;
   }
 
   clampedPos(ac) {

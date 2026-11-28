@@ -1,5 +1,5 @@
 // OpenTower service worker: offline shell for the free simulator.
-const CACHE = 'opentower-v10';
+const CACHE = 'opentower-v11';
 const ASSETS = [
   './',
   './index.html',
