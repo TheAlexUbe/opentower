@@ -22,5 +22,9 @@ config.local.*
 *.local
 
 # Build, test and coverage output
+playwright-report/
+test-results/
+blob-report/
+playwright/.cache/
 coverage/
 dist/

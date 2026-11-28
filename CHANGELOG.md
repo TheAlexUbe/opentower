@@ -5,32 +5,7 @@ All notable changes to OpenTower are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
-
-### Added
-
-- `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, `SECURITY.md` and this changelog.
-- `docs/ARCHITECTURE.md` with the verified module layering and the Graphify
-  god-node/coupling findings.
-- Explicit `npm run lint` script (`node --check`) and CI lint step.
-- JSDoc for public functions, classes and the composition root across `src/`.
-- Defensive `.gitignore` entries for local env files and build output.
-
-### Changed
-
-- `package.json` now declares repository, homepage, bugs, keywords and Node
-  engine metadata for public release.
-
-### Removed
-
-- Tracked `opencode.json` (local Ralph/OpenCode provider wiring) from the public
-  tree; it remains available locally and is now ignored.
-
-### Security
-
-- Documented the private disclosure process in `SECURITY.md`.
-
-## [1.0.0] - 2026-11-26
+## [1.0.0] - 2026-11-28
 
 ### Added
 
@@ -44,7 +19,37 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 - Shift scoring (Safety 40 / Communication 30 / Traffic 30) and debrief.
 - Six built-in scenarios and per-scenario best scores in `localStorage`.
 - Installable offline PWA with controlled service-worker cache updates.
-- Test suite (25 groups) and GitHub Actions CI with syntax checks.
+- Playwright Chromium smoke test covering shift start, spawning, vectors, ILS
+  clearance, tower handoff and touchdown.
+- `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, `SECURITY.md` and this changelog.
+- `docs/ARCHITECTURE.md` with the enforced module boundaries.
+- `tests/architecture.test.mjs` to keep engines DOM-free, prevent duplicated
+  renderer projection code and keep `main.js` a thin composition root.
+- Explicit `npm run lint`, `npm test`, `npm run test:e2e` and `npm run test:all`
+  scripts, plus a CI browser-smoke job.
 
-[Unreleased]: https://github.com/TheAlexUbe/opentower/compare/v1.0.0...HEAD
+### Changed
+
+- Split `TraconRenderer` out of `tracon.js` into `src/tracon-renderer.js`, so
+  `TraconEngine` is fully DOM-free.
+- Added `src/scope-renderer.js` and removed duplicated constructor, `resize`,
+  `sx`, `sy`, `pick` and hit-testing code from both radar renderers.
+- Split the former 1,100-line `main.js` into `src/ui.js` (UI/game loop),
+  `src/i18n.js` (language runtime), `src/voice.js` (voice controller) and a
+  ~20-line composition root in `src/main.js`.
+- `package.json` now declares repository, homepage, bugs, keywords and Node
+  engine metadata for public release.
+
+### Removed
+
+- Tracked `opencode.json`, `.opencode/`, `AGENT.md` and
+  `docs/ENGINE-ANALYSIS.md` from the public tree and from all Git history.
+- Local agent/Ralph setup from the release history; it remains ignored on the
+  development machine.
+
+### Security
+
+- Purged the reverse-engineering analysis document from every branch and commit.
+- Documented the private disclosure process in `SECURITY.md`.
+
 [1.0.0]: https://github.com/TheAlexUbe/opentower/releases/tag/v1.0.0

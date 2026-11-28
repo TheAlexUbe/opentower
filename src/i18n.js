@@ -230,3 +230,116 @@ export function t(lang, key, vars = {}) {
   const template = dict[key] ?? STRINGS.en[key] ?? key;
   return fill(template, vars);
 }
+
+/** True when the selected language is Spanish. */
+export function isSpanish(lang) {
+  return lang === 'es';
+}
+
+/** Pick the English or Spanish variant for the current language. */
+export function pickLanguage(lang, en, es) {
+  return isSpanish(lang) ? es : en;
+}
+
+/**
+ * Build a translator bound to a live language getter.
+ *
+ * @param {() => ('en'|'es')} getLang
+ * @returns {(key: string, vars?: Record<string, string|number>) => string}
+ */
+export function createTranslator(getLang) {
+  return (key, vars = {}) => t(typeof getLang === 'function' ? getLang() : getLang, key, vars);
+}
+
+/**
+ * Apply every `data-i18n*` attribute under a document/root.
+ *
+ * Kept free of app state: callers pass the current pause state and the root so
+ * this can be exercised with a fake DOM in Node.
+ *
+ * @param {'en'|'es'} lang
+ * @param {{root?: Document, paused?: boolean}} [options]
+ */
+export function applyStaticI18n(lang = 'en', { root = globalThis.document, paused = false } = {}) {
+  if (!root) return;
+  const next = lang === 'es' ? 'es' : 'en';
+  root.documentElement.lang = next;
+  root.title = t(next, 'appTitle');
+  for (const el of root.querySelectorAll('[data-i18n]')) {
+    el.textContent = t(next, el.dataset.i18n);
+  }
+  for (const el of root.querySelectorAll('[data-i18n-html]')) {
+    el.innerHTML = t(next, el.dataset.i18nHtml);
+  }
+  for (const el of root.querySelectorAll('[data-i18n-placeholder]')) {
+    el.placeholder = t(next, el.dataset.i18nPlaceholder);
+  }
+  for (const el of root.querySelectorAll('[data-i18n-title]')) {
+    el.title = t(next, el.dataset.i18nTitle);
+  }
+  for (const el of root.querySelectorAll('[data-i18n-aria-label]')) {
+    el.setAttribute('aria-label', t(next, el.dataset.i18nAriaLabel));
+  }
+  const pause = root.querySelector('#btn-pause');
+  if (pause) {
+    const key = paused ? 'resume' : 'pause';
+    pause.title = t(next, key);
+    pause.setAttribute('aria-label', t(next, key));
+  }
+  const mic = root.querySelector('#btn-mic');
+  if (mic) {
+    if (mic.disabled) {
+      mic.title = t(next, 'micTitleUnsupported');
+      mic.setAttribute('aria-label', t(next, 'micTitleUnsupported'));
+    } else if (mic.dataset.braveHint) {
+      mic.title = t(next, 'braveHint');
+      mic.setAttribute('aria-label', t(next, 'braveHint'));
+    } else {
+      mic.title = t(next, 'pushToTalk');
+      mic.setAttribute('aria-label', t(next, 'pushToTalk'));
+    }
+  }
+}
+
+/**
+ * Switch the UI/radio language and refresh every localised surface.
+ *
+ * `onApply` owns app-specific refreshes (strips, radio, engine weather, speech
+ * recognition); this module owns the language state, static DOM and persistence
+ * contract.
+ *
+ * @param {'en'|'es'} lang
+ * @param {{
+ *   settings: {lang: string},
+ *   root?: Document,
+ *   paused?: boolean,
+ *   persist?: boolean,
+ *   selectChip?: (lang: 'en'|'es') => void,
+ *   persistLanguage?: (lang: 'en'|'es') => void,
+ *   onApply?: (lang: 'en'|'es') => void,
+ * }} options
+ * @returns {'en'|'es'} The applied language.
+ */
+export function applyLanguage(lang, {
+  settings,
+  root = globalThis.document,
+  paused = false,
+  persist = true,
+  selectChip = null,
+  persistLanguage = null,
+  onApply = null,
+} = {}) {
+  const next = lang === 'es' ? 'es' : 'en';
+  if (settings) settings.lang = next;
+  selectChip?.(next);
+  applyStaticI18n(next, { root, paused });
+  const cmd = root?.querySelector?.('#cmd');
+  if (cmd) cmd.setAttribute('lang', next);
+  for (const sel of ['#radio', '#live-radio', '#quick', '#strips', '#pending-badge', '#scope-alert', '#voice-toast', '.scope-help', '#wind-line']) {
+    const el = root?.querySelector?.(sel);
+    if (el) el.setAttribute('lang', next);
+  }
+  onApply?.(next);
+  if (persist) persistLanguage?.(next);
+  return next;
+}
