@@ -1,19 +1,37 @@
 # OpenTower
 
+[![CI](https://github.com/TheAlexUbe/opentower/actions/workflows/ci.yml/badge.svg)](https://github.com/TheAlexUbe/opentower/actions/workflows/ci.yml)
+
 **Simulador ATC gratuito y open source para navegador.** Trabaja Ground y Tower
 en Copper Mesa (KXCM), cruza la pista 12 del ramal norte, o ponte en el radar de
 aproximación y vectoriza llegadas. Los pilotos llaman, leen de vuelta y cometen
 errores; tú das las autorizaciones por texto o por voz.
 
+**Demo:** https://thealexube.github.io/opentower/
+
 - Sin cuenta, sin paywall, sin backend.
 - Todo corre en el navegador (HTML + módulos ES, sin build).
-- Voz del navegador: TTS local y STT Web Speech (Chrome/Edge; Brave puede bloquear el servicio).
+- Interfaz y radio bilingües (inglés/español), con TTS local y STT Web Speech.
 - METAR real de KPHX (NWS) que fija viento, altímetro y pista activa; si no hay
   red, usa viento simulado.
 - Instalable como PWA y funcional offline.
 - Código original, licencia MIT.
 
 ![OpenTower tower view](docs/screenshot.png)
+
+![OpenTower demo](docs/demo.gif)
+
+## Navegadores
+
+| Navegador | Juego | TTS | STT (MIC) |
+|---|---|---|---|
+| Chrome / Edge | Sí | Sí | Sí, requiere servicio de voz |
+| Firefox | Sí | Sí | No garantizado |
+| Safari | Sí | Sí | No garantizado |
+| Brave | Sí | Sí | Bloqueado por el servicio de voz |
+
+El juego, el teclado, los tests y el modo offline no dependen de ninguna API de
+voz. Si el STT falla, la app muestra el error y permite escribir la autorización.
 
 ## Arrancar
 
@@ -191,37 +209,63 @@ src/
   config.js       tipos de aeronave, aerolíneas, geometría de KXCM
   airport.js      rutas de rodaje, ramal norte y cruce de la 12
   phraseology.js  parser de intenciones + frases y readbacks
+  i18n.js         diccionario EN/ES, traductor y aplicación del idioma
+  voice.js        voz/TTS, reconocimiento y diagnósticos de micrófono
   engine.js       torre: reloj, movimiento, clearances, conflictos, scoring
+  scope-renderer.js  proyección y hit-testing compartidos de canvas
   render.js       radar de torre en canvas
-  tracon.js       motor y radar de aproximación (TRACON)
+  tracon.js       motor de aproximación (TRACON), sin DOM
+  tracon-renderer.js  radar de aproximación en canvas
   weather.js      METAR/observación NWS y selección de pista
   scenarios.js    escenarios y objetivos
   scenario-state.js  estado puro de escenario/dificultad
-  main.js         UI, bucle, strips, radio, voz
+  ui.js           UI, bucle, strips y radio; sin motores concretos
+  main.js         composition root: conecta motores y renderers
 tests/engine.test.mjs
-docs/ENGINE-ANALYSIS.md
+tests/tower-fixes.test.mjs
+tests/tracon.test.mjs
+tests/i18n.test.mjs
+tests/ui-state.test.mjs
+tests/voice-controller.test.mjs
+tests/architecture.test.mjs
+tests/smoke.spec.js
+playwright.config.js
+.github/workflows/ci.yml
 manifest.webmanifest
 sw.js
 ```
 
-- **Motor puro**: `engine.js` no toca el DOM. `tracon.js` contiene el motor
-  (testeable en Node) y su renderer de canvas.
+- **Motores puros**: `engine.js` y `tracon.js` no tocan el DOM y se testean en
+  Node. Los renderers viven en `render.js` y `tracon-renderer.js`.
+- **Composition root**: `main.js` solo conecta los motores y renderers con
+  `ui.js`; no contiene lógica de interfaz ni de simulación.
+- **Proyección compartida**: `scope-renderer.js` centraliza `resize`, `sx`, `sy`,
+  `pick` y el hit-testing, respetando los ejes Y opuestos de cada radar.
 - **Determinista**: PRNG con semilla; misma semilla, mismo tráfico.
-- **Sin dependencias**: módulos ES nativos, sin frameworks ni CDN.
+- **Sin dependencias de runtime**: módulos ES nativos, sin frameworks ni CDN.
+  Playwright es solo una dependencia de desarrollo para el smoke test.
 - **Datos**: aeropuerto, tipos y libreas ficticios o valores típicos.
+- **Capas verificadas**: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) documenta
+  el mapa de capas real y las reglas de imports. El grafo se regenera con
+  `graphify .` y no se commitea.
 
 ## Tests
 
 ```bash
-npm test          # todos los tests
+npm test          # tests Node sin dependencias
+npm run test:e2e  # smoke test de navegador con Playwright
+npm run test:all  # ambos
 ```
 
 Cubren parser, geometría, salida y llegada completas, puntuación, escenarios,
 cruce de la pista 12 con cerrojo de ocupación, modo TRACON (go-around, localizador,
 vector, descenso, ILS y handoff), cancelación de despegue, hold short, validación
-de pista, inset de final, estado de escenarios, fraseología fonética en inglés y
-español, radio en español, diagnóstico de voz y eventos STT. Incluye un bot de
-300 s para detectar bloqueos.
+de pista, inset de final, estado de escenarios, puntuación sin llamadas
+respondidas, handoffs por distancia, i18n EN/ES, fraseología fonética en inglés y
+español, radio en español, diagnóstico de voz, TTS fonético, eventos STT,
+arquitectura de módulos y el controlador de voz. Incluye un bot de 300 s para
+detectar bloqueos y un smoke test real: cargar, empezar, generar tráfico,
+vectorizar, autorizar ILS, entregar a torre y aterrizar.
 
 ## Alcance
 
@@ -232,9 +276,28 @@ estela, meteorología real, voz local, TRACON, escenarios, PWA offline y debrief
 No incluido (todavía): 8 aeropuertos, SIDs/STARs reales, multiplayer, IA en
 nube. Es un simulador independiente y original, no un clon.
 
+## Roadmap
+
+- **Ahora:** estabilidad de puntuación y handoffs, i18n completa, accesibilidad,
+  PWA con actualización controlada, CI y Pages.
+- **Siguiente:** tutorial interactivo de primer turno, más escenarios, checklist
+  de TRACON y separación de estela más detallada.
+- **Más adelante:** SIDs/STARs, más aeropuertos, multiplayer y perfiles de
+  dificultad avanzados.
+
+## Contribuir
+
+Las contribuciones son bienvenidas. Lee [`CONTRIBUTING.md`](CONTRIBUTING.md) y
+respeta el [`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md). Abre un issue antes de un
+cambio grande. Para vulnerabilidades usa [`SECURITY.md`](SECURITY.md): no abras
+un issue público.
+
+## Versión
+
+Versión actual: **1.0.0**. El historial está en [`CHANGELOG.md`](CHANGELOG.md) y
+las notas de cada versión en
+[GitHub Releases](https://github.com/TheAlexUbe/opentower/releases).
+
 ## Licencia
 
 MIT. Ver `LICENSE`.
-
-Towerline es una marca de sus respectivos propietarios. Este proyecto no usa su
-código, arte, textos ni datos; solo comparte el género de simulación ATC.

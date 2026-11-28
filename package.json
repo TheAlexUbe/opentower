@@ -5,11 +5,34 @@
   "type": "module",
   "private": true,
   "license": "MIT",
+  "homepage": "https://thealexube.github.io/opentower/",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/TheAlexUbe/opentower.git"
+  },
+  "bugs": {
+    "url": "https://github.com/TheAlexUbe/opentower/issues"
+  },
+  "keywords": [
+    "atc",
+    "air-traffic-control",
+    "simulator",
+    "aviation",
+    "pwa",
+    "vanilla-js",
+    "game"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "start": "python3 -m http.server 8080",
-    "test": "node tests/engine.test.mjs && node tests/tower-fixes.test.mjs && node tests/tracon.test.mjs && node tests/ui-state.test.mjs"
+    "lint": "node --check src/*.js tests/*.mjs tests/*.js playwright.config.js sw.js",
+    "test": "node tests/engine.test.mjs && node tests/tower-fixes.test.mjs && node tests/tracon.test.mjs && node tests/i18n.test.mjs && node tests/ui-state.test.mjs && node tests/voice-controller.test.mjs && node tests/architecture.test.mjs",
+    "test:e2e": "playwright test",
+    "test:all": "npm test && npm run test:e2e"
   },
   "devDependencies": {
-    "@doeixd/opencode-ralph-rlm": "^0.4.3"
+    "@playwright/test": "^1.65.1"
   }
 }

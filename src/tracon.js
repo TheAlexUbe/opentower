@@ -19,6 +19,8 @@ const REASONS_ES = {
   'not established on the approach': 'no está establecido en la aproximación',
   'not in tower airspace yet': 'aún no está en el espacio aéreo de la torre',
   'not a departure': 'no es una salida',
+  'not at the center handoff point yet': 'aún no está en el punto de transferencia a centro',
+  'too close to the runway for a handoff': 'demasiado cerca de la pista para la transferencia',
   'approach clearance is for arrivals': 'la autorización de aproximación es para las llegadas',
   'already handed off': 'ya fue transferido',
   'not on the approach course': 'no está en el curso de aproximación',
@@ -110,6 +112,21 @@ function compass(deg, lang = 'en') {
   return dirs[Math.round(norm360(deg) / 45) % 8];
 }
 
+/**
+ * Deterministic approach (TRACON) simulation engine.
+ *
+ * Owns radar arrivals, vectors, descent, localizer/ILS capture, separation,
+ * go-arounds and handoffs. Pure logic and Node-testable; it does not touch the
+ * DOM. The canvas renderer lives in `tracon-renderer.js`.
+ *
+ * @param {object} [options]
+ * @param {number} [options.duration=600] - Shift length in simulated seconds.
+ * @param {string} [options.difficulty='calm'] - Difficulty id.
+ * @param {number} [options.seed=1] - PRNG seed; same seed, same traffic.
+ * @param {object|null} [options.weather] - Pre-fetched weather snapshot.
+ * @param {object|null} [options.scenario] - Built-in scenario override.
+ * @param {'en'|'es'} [options.lang='en'] - Radio language.
+ */
 export class TraconEngine {
   constructor({ duration = 600, difficulty = 'calm', seed = 1, weather = null, scenario = null, lang = 'en' } = {}) {
     this.mode = 'tracon';
@@ -123,11 +140,12 @@ export class TraconEngine {
     this.paused = false;
     this.aircraft = [];
     this.radio = [];
+    this.radioSeq = 0;
     this.incidents = [];
     this.incidentCooldown = new Map();
     this.nextId = 1;
     this.callsigns = new Set();
-    this.stats = { served: 0, failed: 0, clearanceErrors: 0, responseTimes: [], departureWaits: [] };
+    this.stats = { served: 0, failed: 0, clearanceErrors: 0, responseTimes: [], departureWaits: [], unanswered: 0 };
     this.weather = weather;
     const windDir = weather?.windDir ?? (this.rand() < 0.5 ? 270 : 90);
     this.activeRunway = scenario?.runway ?? runwayForWind(windDir);
@@ -152,7 +170,7 @@ export class TraconEngine {
   }
 
   log(from, text, freq = 'APP') {
-    this.radio.push({ t: this.t, from, text, freq });
+    this.radio.push({ seq: ++this.radioSeq, t: this.t, from, text, freq });
     if (this.radio.length > 400) this.radio.splice(0, this.radio.length - 400);
   }
 
@@ -571,6 +589,7 @@ export class TraconEngine {
     if (/(^| )(CONTACT TOWER|CONTACTE (CON )?(LA )?TORRE|CAMBIO (A|CON) (LA )?TORRE|CONTACTAR (LA )?TORRE|LLAME A (LA )?TORRE|CAMBIE A (LA )?TORRE|PASE A (LA )?TORRE)( |$)/.test(t)) {
       if (ac.kind !== 'arrival' || !ac.onApproach) return this.unable(ac, 'not established on the approach');
       const d = Math.hypot(ac.x - this.geo.thresholdX, ac.y);
+      if (d < 1.5 * NM) return this.unable(ac, 'too close to the runway for a handoff');
       if (d > 6 * NM) return this.unable(ac, 'not in tower airspace yet');
       ac.handed = true;
       ac.phase = 'done';
@@ -585,6 +604,8 @@ export class TraconEngine {
 
     if (/(^| )(CONTACT (CENTER|DEPARTURE)|CONTACTE (CON )?(EL )?(CENTRO|SALIDAS)|CAMBIO (A|CON) (EL )?(CENTRO|SALIDAS)|CONTACTAR (EL )?(CENTRO|SALIDAS)|LLAME A (EL )?(CENTRO|SALIDAS)|CAMBIE A (EL )?(CENTRO|SALIDAS)|PASE A (EL )?(CENTRO|SALIDAS))( |$)/.test(t)) {
       if (ac.kind !== 'departure') return this.unable(ac, 'not a departure');
+      const d = Math.hypot(ac.x, ac.y);
+      if (d < 15 * NM) return this.unable(ac, 'not at the center handoff point yet');
       ac.phase = 'done';
       ac.doneAt = this.t;
       this.stats.served += 1;
@@ -725,13 +746,15 @@ export class TraconEngine {
   }
 
   computeScore() {
+    const es = this.lang === 'es';
     const active = this.aircraft.filter((a) => !['done', 'removed'].includes(a.phase));
     const conflicts = this.incidents.filter((i) => i.type === 'air').length;
     const deviations = this.incidents.filter((i) => i.type === 'deviation').length;
     const safety = Math.max(0, 40 - conflicts * 8 - deviations * 4);
     const times = this.stats.responseTimes;
-    const credit = times.length ? times.reduce((sum, t) => sum + this.responseCredit(t), 0) / times.length : 1;
-    const comms = Math.max(0, Math.round(30 * credit) - this.stats.clearanceErrors * 2);
+    const credit = times.length ? times.reduce((sum, t) => sum + this.responseCredit(t), 0) / times.length : 0;
+    const unanswered = this.stats.unanswered || 0;
+    const comms = Math.max(0, Math.round(30 * credit) - this.stats.clearanceErrors * 2 - unanswered * 2);
     const waiting = active.filter((a) => ['cruise', 'approach', 'final', 'departed'].includes(a.phase)).length;
     const denom = this.stats.served + this.stats.failed + waiting * 0.5;
     const traffic = denom ? Math.round(30 * (this.stats.served / denom)) : 30;
@@ -739,22 +762,47 @@ export class TraconEngine {
     const grade = total >= 97 ? 'A+' : total >= 90 ? 'A' : total >= 80 ? 'B' : total >= 70 ? 'C' : total >= 60 ? 'D' : 'F';
     const objectives = [];
     const goals = this.scenario?.goals;
-    if (goals?.served) objectives.push({ label: `Handle ${goals.served} aircraft`, ok: this.stats.served >= goals.served });
-    if (goals?.maxIncidents != null) objectives.push({ label: `At most ${goals.maxIncidents} incident(s)`, ok: this.incidents.length <= goals.maxIncidents });
+    if (goals?.served) {
+      objectives.push({
+        label: es ? `Atender ${goals.served} aeronaves` : `Handle ${goals.served} aircraft`,
+        ok: this.stats.served >= goals.served,
+      });
+    }
+    if (goals?.maxIncidents != null) {
+      objectives.push({
+        label: es ? `Como máximo ${goals.maxIncidents} incidencia(s)` : `At most ${goals.maxIncidents} incident(s)`,
+        ok: this.incidents.length <= goals.maxIncidents,
+      });
+    }
+    const safetyNotes = [
+      conflicts ? (es ? `${conflicts} conflicto(s)` : `${conflicts} conflict(s)`) : (es ? 'Sin pérdidas de separación.' : 'No separation losses.'),
+      deviations ? (es ? `${deviations} frustrada(s)` : `${deviations} go-around(s)`) : '',
+    ].filter(Boolean);
+    const commsNotes = [
+      times.length
+        ? (es
+          ? `${times.filter((x) => x <= 20).length} de ${times.length} llamadas respondidas en 20 s.`
+          : `${times.filter((x) => x <= 20).length} of ${times.length} calls answered within 20 s.`)
+        : (es ? 'No se respondió ninguna llamada.' : 'No pilot calls.'),
+      unanswered ? (es ? `${unanswered} llamada(s) sin responder.` : `${unanswered} call(s) left unanswered.`) : '',
+      this.stats.clearanceErrors ? (es ? `${this.stats.clearanceErrors} error(es) de autorización.` : `${this.stats.clearanceErrors} clearance error(s).`) : '',
+    ].filter(Boolean);
+    const trafficNotes = [
+      denom
+        ? (es
+          ? `${this.stats.served} de ${Math.round(denom * 2) / 2} aeronaves atendidas.`
+          : `${this.stats.served} of ${Math.round(denom * 2) / 2} aircraft handled.`)
+        : (es ? 'Sin tráfico.' : 'No traffic.'),
+      waiting ? (es ? `${waiting} aún en frecuencia.` : `${waiting} still on frequency.`) : '',
+    ].filter(Boolean);
     return {
       total,
       grade,
       objectives,
       parts: [
-        { key: 'safety', label: 'Safety', points: safety, max: 40, notes: [conflicts ? `${conflicts} conflict(s)` : 'No separation losses.', deviations ? `${deviations} go-around(s)` : ''].filter(Boolean) },
-        {
-          key: 'communication',
-          label: 'Communication',
-          points: comms,
-          max: 30,
-          notes: [times.length ? `${times.filter((x) => x <= 20).length} of ${times.length} calls answered within 20 s.` : 'No pilot calls.', this.stats.clearanceErrors ? `${this.stats.clearanceErrors} clearance error(s).` : ''].filter(Boolean),
-        },
-        { key: 'traffic', label: 'Traffic', points: traffic, max: 30, notes: [denom ? `${this.stats.served} of ${Math.round(denom * 2) / 2} aircraft handled.` : 'No traffic.', waiting ? `${waiting} still on frequency.` : ''].filter(Boolean) },
+        { key: 'safety', label: es ? 'Seguridad' : 'Safety', points: safety, max: 40, notes: safetyNotes },
+        { key: 'communication', label: es ? 'Comunicación' : 'Communication', points: comms, max: 30, notes: commsNotes },
+        { key: 'traffic', label: es ? 'Tráfico' : 'Traffic', points: traffic, max: 30, notes: trafficNotes },
       ],
       incidents: this.incidents.slice(),
     };
@@ -786,265 +834,5 @@ export class TraconEngine {
 
   remaining() {
     return Math.max(0, this.duration - this.t);
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Approach radar renderer.
-
-const TR_WORLD = { x: 22 * NM, y: 22 * NM };
-const TR_COLORS = {
-  bg: '#060a10',
-  grid: 'rgba(90,120,150,0.10)',
-  gridStrong: 'rgba(90,120,150,0.18)',
-  text: '#b9c7d6',
-  dim: '#6c7f93',
-  green: '#3cf07a',
-  amber: '#ffc23d',
-  red: '#ff5b5b',
-  cyan: '#54d7ff',
-  white: '#eef4fa',
-};
-
-export class TraconRenderer {
-  constructor(canvas) {
-    this.canvas = canvas;
-    this.ctx = canvas.getContext('2d');
-    this.engine = null;
-    this.selectedId = null;
-    this.scale = 1;
-    this.ox = 0;
-    this.oy = 0;
-    this.dpr = 1;
-    this.cssW = 0;
-    this.cssH = 0;
-    this.nm = NM;
-  }
-
-  setEngine(engine) { this.engine = engine; }
-
-  resize() {
-    const rect = this.canvas.getBoundingClientRect();
-    this.dpr = Math.min(window.devicePixelRatio || 1, 2);
-    this.cssW = Math.max(320, rect.width);
-    this.cssH = Math.max(260, rect.height);
-    this.canvas.width = Math.round(this.cssW * this.dpr);
-    this.canvas.height = Math.round(this.cssH * this.dpr);
-    this.scale = Math.min((this.cssW - 40) / (TR_WORLD.x * 2), (this.cssH - 40) / (TR_WORLD.y * 2));
-    this.ox = this.cssW / 2;
-    this.oy = this.cssH / 2;
-  }
-
-  sx(x) { return this.ox + x * this.scale; }
-  sy(y) { return this.oy - y * this.scale; }
-  toWorld(px, py) { return { x: (px - this.ox) / this.scale, y: -(py - this.oy) / this.scale }; }
-
-  clampedPos(ac) {
-    return {
-      x: clamp(this.sx(ac.x), 18, this.cssW - 18),
-      y: clamp(this.sy(ac.y), 18, this.cssH - 18),
-    };
-  }
-
-  pick(px, py) {
-    if (!this.engine) return null;
-    let best = null;
-    let bestD = 26;
-    for (const ac of this.engine.activeAircraft()) {
-      const p = this.clampedPos(ac);
-      const d = Math.hypot(p.x - px, p.y - py);
-      if (d < bestD) {
-        bestD = d;
-        best = ac;
-      }
-    }
-    return best;
-  }
-
-  draw() {
-    if (!this.engine) return;
-    const ctx = this.ctx;
-    ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
-    ctx.clearRect(0, 0, this.cssW, this.cssH);
-    ctx.fillStyle = TR_COLORS.bg;
-    ctx.fillRect(0, 0, this.cssW, this.cssH);
-
-    this.drawGrid();
-    this.drawAirspace();
-    this.drawAircraft();
-    this.drawHud();
-  }
-
-  drawGrid() {
-    const ctx = this.ctx;
-    const step = 5 * NM;
-    for (let d = -20; d <= 20; d += 5) {
-      const x = d * NM;
-      const y = d * NM;
-      ctx.strokeStyle = d % 10 === 0 ? TR_COLORS.gridStrong : TR_COLORS.grid;
-      ctx.beginPath();
-      ctx.moveTo(this.sx(x), this.sy(-TR_WORLD.y));
-      ctx.lineTo(this.sx(x), this.sy(TR_WORLD.y));
-      ctx.stroke();
-      ctx.beginPath();
-      ctx.moveTo(this.sx(-TR_WORLD.x), this.sy(y));
-      ctx.lineTo(this.sx(TR_WORLD.x), this.sy(y));
-      ctx.stroke();
-    }
-    for (let r = 5; r <= 20; r += 5) {
-      ctx.beginPath();
-      ctx.arc(this.sx(0), this.sy(0), r * NM * this.scale, 0, Math.PI * 2);
-      ctx.strokeStyle = TR_COLORS.gridStrong;
-      ctx.stroke();
-      ctx.fillStyle = TR_COLORS.dim;
-      ctx.font = '9px ui-monospace, monospace';
-      ctx.textAlign = 'left';
-      ctx.fillText(`${r}`, this.sx(r * NM * 0.7071) + 4, this.sy(r * NM * 0.7071) - 4);
-    }
-  }
-
-  drawAirspace() {
-    const ctx = this.ctx;
-    const geo = this.engine.geo;
-    // Runway.
-    ctx.strokeStyle = TR_COLORS.white;
-    ctx.lineWidth = 3;
-    ctx.beginPath();
-    ctx.moveTo(this.sx(-850), this.sy(0));
-    ctx.lineTo(this.sx(850), this.sy(0));
-    ctx.stroke();
-    ctx.fillStyle = TR_COLORS.dim;
-    ctx.font = '9px ui-monospace, monospace';
-    ctx.textAlign = 'center';
-    ctx.fillText(`${this.engine.lang === 'es' ? 'PISTA' : 'RWY'} ${geo.runway}`, this.sx(0), this.sy(0) + 16);
-
-    // Final approach course extends outward from the threshold (opposite the landing heading).
-    const courseHdg = geo.courseHeading;
-    const fx = Math.sin(courseHdg * RAD);
-    const fy = Math.cos(courseHdg * RAD);
-    ctx.strokeStyle = 'rgba(60,240,122,0.45)';
-    ctx.setLineDash([6, 6]);
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(this.sx(geo.thresholdX), this.sy(0));
-    ctx.lineTo(this.sx(geo.thresholdX + fx * 10 * NM), this.sy(fy * 10 * NM));
-    ctx.stroke();
-    ctx.setLineDash([]);
-
-    // Fixes.
-    const fixes = [
-      { name: 'COPPER', x: 8 * NM, y: 8 * NM },
-      { name: 'SUN', x: 10 * NM, y: -2 * NM },
-      { name: 'RIDGE', x: 2 * NM, y: 10 * NM },
-      { name: 'MESA', x: -8 * NM, y: -8 * NM },
-    ];
-    for (const fix of fixes) {
-      ctx.strokeStyle = TR_COLORS.dim;
-      ctx.lineWidth = 1;
-      ctx.save();
-      ctx.translate(this.sx(fix.x), this.sy(fix.y));
-      ctx.rotate(Math.PI / 4);
-      ctx.strokeRect(-4, -4, 8, 8);
-      ctx.restore();
-      ctx.fillStyle = TR_COLORS.dim;
-      ctx.font = '9px ui-monospace, monospace';
-      ctx.textAlign = 'left';
-      ctx.fillText(fix.name, this.sx(fix.x) + 8, this.sy(fix.y) + 3);
-    }
-  }
-
-  drawAircraft() {
-    const ctx = this.ctx;
-    for (const ac of this.engine.activeAircraft()) {
-      const p = this.clampedPos(ac);
-      const off = Math.abs(p.x - this.sx(ac.x)) > 1 || Math.abs(p.y - this.sy(ac.y)) > 1;
-      const selected = ac.id === this.selectedId;
-      const color = selected
-        ? TR_COLORS.white
-        : ac.phase === 'goAround'
-          ? TR_COLORS.red
-          : ac.kind === 'arrival'
-            ? TR_COLORS.amber
-            : TR_COLORS.cyan;
-
-      if (off) {
-        ctx.save();
-        ctx.translate(p.x, p.y);
-        ctx.rotate(ac.hdg * RAD);
-        ctx.fillStyle = color;
-        ctx.beginPath();
-        ctx.moveTo(10, 0);
-        ctx.lineTo(-7, 6);
-        ctx.lineTo(-7, -6);
-        ctx.closePath();
-        ctx.fill();
-        ctx.restore();
-        ctx.fillStyle = color;
-        ctx.font = '10px ui-monospace, monospace';
-        ctx.textAlign = 'center';
-        ctx.fillText(ac.callsign, p.x, p.y - 12);
-        continue;
-      }
-
-      ctx.save();
-      ctx.translate(p.x, p.y);
-      ctx.rotate(ac.hdg * RAD);
-      ctx.fillStyle = color;
-      const size = ac.wake === 'H' || ac.wake === 'J' ? 8 : 6;
-      ctx.beginPath();
-      ctx.moveTo(size + 2, 0);
-      ctx.lineTo(-size, size * 0.8);
-      ctx.lineTo(-size * 0.4, 0);
-      ctx.lineTo(-size, -size * 0.8);
-      ctx.closePath();
-      ctx.fill();
-      ctx.restore();
-
-      if (selected) {
-        ctx.strokeStyle = 'rgba(255,255,255,0.8)';
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, 16, 0, Math.PI * 2);
-        ctx.stroke();
-      }
-
-      const line2 = `${ac.type.code} ${Math.round(ac.alt)}ft ${Math.round(ac.speed)}kt`;
-      const tag = ac.assignedHdg != null || ac.assignedAlt != null
-        ? `${pad3(ac.assignedHdg ?? ac.hdg)} / ${Math.round(ac.assignedAlt ?? ac.alt)}`
-        : ac.phase.toUpperCase();
-      ctx.fillStyle = 'rgba(5,8,13,0.72)';
-      ctx.fillRect(p.x + 10, p.y - 13, 118, 24);
-      ctx.textAlign = 'left';
-      ctx.font = 'bold 11px ui-monospace, monospace';
-      ctx.fillStyle = color;
-      ctx.fillText(ac.callsign, p.x + 13, p.y - 3);
-      ctx.font = '10px ui-monospace, monospace';
-      ctx.fillStyle = TR_COLORS.dim;
-      ctx.fillText(line2, p.x + 13, p.y + 9);
-      ctx.fillStyle = TR_COLORS.dim;
-      ctx.fillText(tag, p.x + 13, p.y + 20);
-    }
-  }
-
-  drawHud() {
-    const ctx = this.ctx;
-    ctx.textAlign = 'right';
-    ctx.font = 'bold 11px ui-monospace, monospace';
-    ctx.fillStyle = TR_COLORS.green;
-    ctx.fillText(
-      this.engine.lang === 'es'
-        ? `APP ${this.engine.appFreq} · PISTA ${this.engine.geo.runway}`
-        : `APP ${this.engine.appFreq} · RWY ${this.engine.geo.runway}`,
-      this.cssW - 16,
-      22,
-    );
-    ctx.fillStyle = TR_COLORS.dim;
-    ctx.font = '10px ui-monospace, monospace';
-    ctx.fillText(
-      `${this.engine.lang === 'es' ? 'VIENTO' : 'WIND'} ${pad3(this.engine.wind.dir)}/${pad2(this.engine.wind.speed)} · ATIS ${this.engine.atis}`,
-      this.cssW - 16,
-      38,
-    );
-    ctx.textAlign = 'left';
-    ctx.fillText('5/10/15/20 NM', 18, this.cssH - 16);
   }
 }

@@ -3,6 +3,15 @@
 
 const STATION = 'KPHX';
 
+/**
+ * Fetch the latest KPHX observation from the National Weather Service.
+ *
+ * Resolves to `null` on any failure (offline, CORS, timeout, malformed payload)
+ * so the caller can fall back to simulated wind.
+ *
+ * @param {{timeoutMs?: number}} [options] - Abort timeout in milliseconds.
+ * @returns {Promise<object|null>} Normalised weather, or null.
+ */
 export async function fetchWeather({ timeoutMs = 4000 } = {}) {
   if (typeof fetch !== 'function') return null;
   const canAbort = typeof AbortController !== 'undefined';
